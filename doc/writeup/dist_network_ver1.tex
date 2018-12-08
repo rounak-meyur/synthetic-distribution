@@ -1,0 +1,128 @@
+\documentclass[12pt]{amsart}
+%%
+\usepackage{microtype}
+\usepackage{amsmath,amssymb}
+\usepackage{array,delarray}
+\usepackage[dvips]{graphicx} \usepackage{xspace}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage[square,sort&compress,numbers]{natbib}
+\usepackage{times}
+%\usepackage{caption}
+\usepackage{subfig}
+%\usepackage{subcaption}
+\usepackage{colortbl}
+\usepackage[table]{xcolor}
+\usepackage{url}
+\usepackage{microtype}
+
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,linkcolor=blue,citecolor=blue,urlcolor=blue}
+
+%%
+\graphicspath{{./}{./figs/}}
+
+%%\usepackage{citesort}
+%\usepackage{sidecap}
+%\usepackage{times} % assumes new font selection scheme installed
+%\usepackage[small]{caption}
+
+
+\usepackage[colorinlistoftodos]{todonotes}
+\newcommand{\TODO}[1]{\todo[inline,color=red!20,size=\small]{#1}}
+\newcommand{\aacomment}[1]{({\color{magenta}AA: #1})}
+
+
+
+\renewcommand{\thesection}{\Roman{section}}
+%%\renewcommand{\thesubsection}{\thesection.\Alph{subsection}}
+\renewcommand{\thesubsection}{{\bfseries\Alph{subsection}}}
+
+%%
+%%
+\renewcommand\labelitemi{\rule[0.12em]{0.4em}{0.4em}}
+\renewcommand\labelitemii{\normalfont\bfseries
+  \rule[0.15em]{0.3em}{0.3em}}
+\renewcommand\labelitemiii{\textasteriskcentered}
+\renewcommand\labelitemiv{\textperiodcentered}
+%%
+%%
+\newtheorem{theorem}{Theorem}[section] % Numbered within each section
+\newtheorem{corollary}[theorem]{Corollary} % Numbered along with thm
+\newtheorem{lemma}[theorem]{Lemma} % Numbered along with thm
+\newtheorem{proposition}[theorem]{Proposition} % Numbered along with  thm
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition} % Numbered along with thm
+\theoremstyle{remark} \newtheorem{remark}[theorem]{Remark} % Numbered along with thm
+\newtheorem{example}[theorem]{Example} % Numbered along with thm
+\numberwithin{equation}{section} % Number equations within sections
+%%
+%% 8.5 x 11 with 1 inch margins all over.
+\setlength{\captionindent}{1.0pc}
+\usepackage[left=1.00in,top=1.00in,right=1.00in,bottom=1.00in,headheight=39pt,headsep=2pt]{geometry}
+\usepackage{fancyhdr}
+
+
+\parskip6pt
+\parindent0pt
+
+%% ----------------------------------------------------------------------
+
+\def\twitter{Twitter\xspace}
+\def\prob{\mathrm{Pr}}
+\def\npsonesystem{NPS-1\xspace}
+\def\taskname#1{\textbf{#1}}
+%% ----------------------------------------------------------------------
+
+\def\title{Creating synthetic distribution networks}
+
+\pagestyle{fancy}
+\fancyhead{}
+\fancyfoot{}
+%%\renewcommand{\headrulewidth}{0.4pt}
+\fancyfoot[C]{\rlap{\phantom{$\int$}}\thepage}
+\fancyhead[L]{{\small\hbox{\title}}}
+
+%% ----------------------------------------------------------------------
+
+\def\itemsym{\par\rule[0.5mm]{2mm}{2mm}\xspace\hangindent=12pt}
+\def\itemnum#1{\par#1\xspace\hangindent=12pt}
+%%
+\begin{document}
+	\thispagestyle{fancy} \phantom{}
+	
+	\section{Problem Statement}
+	This work proposes a methodology to generate a realistic synthetic distribution system network for a particular region (consisting of one or more counties). The proposed algorithm takes a list of counties as input and generates a distribution network in the form of a graph. It is assumed that the location of the substations are known along with the commercial and domestic consumers in the required county. The distribution network is developed like a two hop spanning tree: $(i)$ the first hop being the connection from the distribution feeder at the substation to a local transformer and $(ii)$ the second hop is the connection from the transformer to the domestic and commercial consumers. The formation of the proposed hierarchic network requires two clustering algorithms:
+	\begin{enumerate}
+		\item The first clustering considers the substation locations as the centers and assigns the domestic or commercial consumers to a suitable substation. Such a clustering algorithm aims to map each consumer location to a neighboring substation such that the distance between the points is minimized.
+		\item The second algorithm partitions the consumer points for every substation into multiple clusters. The idea behind such a clustering is to group the consumer points such that every transformer serves not more than a pre-defined number of consumers. In practice, ever
+	\end{enumerate}
+	
+	\section{Algorithm}
+	\subsection{Forming Voronoi regions}
+	The first clustering algorithm forms Voronoi regions with each substation location as the center. For every center, there exists a corresponding region consisting of all points closer to the center than to any other centers. Therefore, the algorithm partitions the 2-d plane into multiple regions. Each such region corresponds to each substation location as the center of the region. Hence, every consumer location can be mapped to any of the substations.
+	\par
+	The python function executing the above algorithm takes as input $(i)$ dictionary of substation locations (keys are the substation IDs and values are tuples of their longitude latitudes) and $(ii)$ dictionary of consumer locations (keys are the consumer IDs and values are tuples of their longitude latitudes). The output of the function is a dictionary with keys as substation IDs and values as the consumer IDs corresponding to the consumers inside the Voronoi region for each substation.
+	\subsection{Forming k-means cluster}
+	The second clustering algorithm aims to cluster the consumer points in each Voronoi region into $k$ clusters. The value of $k$ is determined from the assumption made for the capacity of the transformer. As a preliminary assumption to generate distribution networks, we have considered that every transformer can be connected to at most $p$ consumer points. Therefore, for each Voronoi region, the value of $k$ is determined as $k=\big[\frac{n}{p}\big]+1$, where $n$ is the number of consumers in the Voronoi region and $[x]$ denotes the integer part of $x$.
+	\par
+	First, the location of the $k$ centers for each Voronoi region are identified and then the consumer points in the region are indexed based on which among the $k$ clusters they belong to. The python function executing the above algorithm takes as input $(i)$ the output dictionary from the previous algorithm, $(ii)$ the dictionary of consumer locations (keys are the consumer IDs and values are tuples of their longitude latitudes) and $(iii)$ the numerical condition $p$. The output of the function is $(i)$ dictionary of transformer locations (keys are the transformer IDs and values are tuples of their longitude latitudes) and $(ii)$ a dictionary with keys as the substation IDs and values as another dictionary. The second dictionary consists of keys as the $k$ transformer IDs and values as the consumer IDs corresponding to each of the $k$ clusters.
+	
+	\section{Results}
+	The above algorithm is executed for the substations and consumer locations in Montgomery county (having a FIPS code of 121) of Virginia (having a FIPS code of 51), USA. Figure \ref{voronoi} shows the Voronoi regions for the substations in the Montgomery county. The blue points denote these locations and the polygons denote the Voronoi region for each substation.
+%	\begin{figure}[ht]
+%		\begin{center}
+%			\includegraphics[width=1\textwidth]{./figs/voronoi_121.pdf}
+%			\caption{Voronoi regions for the substations in Montgomery county of Virginia, USA}
+%			\label{voronoi}
+%		\end{center}
+%	\end{figure}
+	The final distribution network generated for the substations and consumer locations in the Montgomery county is shown in Figure \ref{network}. The red nodes indicate the substations, the blue nodes denote the transformers and the green nodes the consumer points. The red edges indicate the distribution lines from the substation feeders to the transformer and the blue edges denote the connection between the transformers and the consumer points.
+%	\begin{figure}[ht]
+%		\begin{center}
+%			\includegraphics[width=1\textwidth]{./figs/network_121.pdf}
+%			\caption{Realistic synthetic distribution network for Montgomery county of Virginia, USA}
+%			\label{network}
+%		\end{center}
+%	\end{figure} 
+\end{document}
