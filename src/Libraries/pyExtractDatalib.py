@@ -284,3 +284,33 @@ def get_files_from_db(homeact_out_fname, subpos_out_fname):
     # -------------------------------------------------------------------------
     # Close connection with database
     conn.close()
+    
+    
+def extract_power_data(input_csv_file):
+    '''
+    '''
+    f = open(input_csv_file,'r')
+    lines = f.readlines()[1:]
+    f.close()
+    L = [l.strip('\n').split(',') for l in lines]
+    HomeAct = {L[k][0]:[L[k][2:]] for k in range(len(L))}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,68 @@
+\section{Goal}\label{sec:goal}
+In this work, we try to generate the distribution network for a given county from the available open source data (substation location information, NAVTEQ transportation network data and synthetic population data). The distribution system is assumed to have a radial/tree structure and closely replicate a real distribution network. The goal of this work is to generate the primary and secondary distribution network to connect the substations to activity locations.
+
+\section{Data set}\label{sec:dataset}
+The NAVTEQ transportation network data is available in the form of an edge-list or a list of links. Each link has associated an integer level from the set $\{1,2,3,4,5\}$ that describes the link type (e.g., a level-1 link could correspond to an Interstate road segment, while a level-5 link could correspond to a residential road). All links with level $\leq2$ are removed from the dataset. These links are dropped since	components of the distribution network (e.g., homes) are typically not located along these links. The synthetic population data and the substation information is available for the entire United States and stored in a database together with the NAVTEQ data. The synthetic distribution network is generated for a particular county. For this purpose, the required data set is selected from the master database based on the zip code information. The available data set is therefore listed as below.
+\begin{enumerate}
+	\item[(i)] The road network represented in the form of a graph $\mathcal{R}=(\mathcal{V},\mathcal{L})$, where $\mathcal{V}$ and $\mathcal{L}$ are respectively the sets of nodes and links of the network. 
+	\item[(ii)] The set of substations $\mathcal{S}=\{s_1,s_2,\cdots,s_M\}$, where the county consists of $M$ substations.
+	\item[(iii)] The set of activity locations $\mathcal{H}=\{h_1,h_2,\cdots,h_N\}$, where the county consists of $N$ activity locations.
+\end{enumerate}
+Each node in the road network graph, the substations and activity locations has an associated spatial embedding in the form of longitude and latitude.
+
+\section{Approach}\label{sec:approach}
+We want a mapping between the substations and activity locations. This can be achieved by mapping the substations to nodes of the road network and assigning a map between activity locations and road network links. The road network can be used as a proxy for the primary distribution network. The secondary distribution network can be generated from the second map.
+
+\section{Algorithm}
+\subsection{Constructing the mapping}\label{subsec:map}
+\begin{enumerate}
+	\item[(a)] Assign a road node proxy to each substation using the map $g:\mathcal{S}\rightarrow \mathcal{V}$. In this case, the substation $s\in\mathcal{S}$ is assigned to its nearest element in $\mathcal{V}$. We have
+	\begin{equation}\mathcal{N}=\{g(s),\ \textrm{for all }s\in\mathcal{S}\}\end{equation} 
+	\textbf{Special Case:} $|g^{-1}(n)|>1$ for some $n\in\mathcal{N}$ where $|\cdot|$ is cardinality of the set $``\cdot"$. This implies multiple substations are located near to each other and therefore have the same road network node $n$ mapped to them. This problem can be solved in two ways:\\
+	(\textit{i}) combining the substations to a single substation and\\
+	(\textit{ii}) select a different proxy road node for each substation.
+	\item[(b)] Find connected components $\mathcal{C}_1,\mathcal{C}_2,\cdots\mathcal{C}_L$ in the road network graph. Let the $i^{th}$ connected component be denoted by $\mathcal{C}_i=(\mathcal{V}_i,\mathcal{L}_i)$, where $\mathcal{V}_i$ and $\mathcal{L}_i$ are respectively the sets of nodes and links of the connected component. We remove the connected components $\mathcal{C}_i$ which do not have any common nodes with the set $\mathcal{N}$. 
+	\begin{equation}\mathcal{R}=\mathcal{R}[\mathcal{V}\setminus\mathcal{V}_i],\ \textrm{if}\ \mathcal{V}_i\cap\mathcal{N}=\emptyset,\ \textrm{for}\ i=1,2,\cdots,L\end{equation}
+	\item[(c)] Each link $e\in\mathcal{L}$ has a weight associated with it and is given by $l(e)$. Let $d:\mathcal{V}\times\mathcal{V}\rightarrow\mathbb{R}^{+}$ be the graph distance in $\mathcal{R}$ using $l(e)$ as the weight of links. Since $\mathcal{N}\subset\mathcal{V}$, let $d(v,n)$ be the graph distance between the road node $v\in\mathcal{V}$ and road node proxy for a substation $n\in\mathcal{N}$. We define a map $q:\mathcal{V}\rightarrow\mathcal{N}$ which assigns to every road node $v\in\mathcal{V}$ its nearest element in $\mathcal{N}$.
+	\begin{equation}q(v)=\argmin_{n\in\mathcal{N}}{d(v,n)}\end{equation}
+	The inverse map $q^{-1}(n)$ is the set of nodes $v\in\mathcal{V}$ which are nearest to the road node proxy $n$.	We identify a mapping between the substations and road network. Let $\mathcal{V}_s$ denotes the road network nodes mapped to the substation $s$ and is given by
+	\begin{equation}\mathcal{V}_s=\{q^{-1}(g(s)),\ \textrm{for}\ s\in\mathcal{S}\}\end{equation}
+	
+	\item[(d)] For each activity location $h\in\mathcal{H}$, there exists a mapping $f:\mathcal{H}\rightarrow\mathcal{L}$ which assigns its nearest road link $e\in\mathcal{L}$. Let $\mathcal{H}_e$ denote the set of activity locations mapped to the road network link $e\in\mathcal{L}$.
+	\begin{equation}\mathcal{H}_e=\{f^{-1}(e),\ \textrm{for}\ e\in\mathcal{L}\}\end{equation}
+	
+	\item[(e)] Let $\mathsf{E}(v)$ denote the straight line equation represented by the edge $e$ such that all coordinates along edge $e$ satisfies $\mathsf{E}(v)=0$. Each activity location $h\in\mathcal{H}_e$ is included in either set $\mathcal{H}_{e,A}$ or $\mathcal{H}_{e,B}$ depending on whether $\mathsf{E}(h)$ is positive or negative respectively.
+	\begin{equation}
+	\begin{aligned}
+	\mathcal{H}_{e,A}=\{h,\ \textrm{if}\ \mathsf{E}(h)\geq 0,\ \textrm{for}\ h\in\mathcal{H}_e\}\\
+	\mathcal{H}_{e,B}=\{h,\ \textrm{if}\ \mathsf{E}(h)< 0,\ \textrm{for}\ h\in\mathcal{H}_e\}
+	\end{aligned}
+	\end{equation}
+	
+	\item[(f)] Let an edge $e\in\mathcal{L}$ be given by $e(v_i,v_j)$ where $v_i$ and $v_j$ are the nodes at two ends of edge $e$. Let $c:\mathcal{V}\times\mathcal{H}\rightarrow\mathbb{R}^{+}$ be the Euclidean distance between a road node and an activity location. Therefore, $c(v,h)$ is the Euclidean distance between road node $v$ and activity location $h$. For each activity location $h\in\mathcal{H}_{e}$, we assign a mapping $p:\mathcal{H}\rightarrow\mathcal{R}$ such that
+	\begin{equation}
+	p(h)=
+	\begin{cases}
+	v_i,\quad \textrm{if}\ c(v_i,h)<c(v_j,h)\\
+	v_j,\quad \textrm{otherwise}
+	\end{cases}
+	\end{equation}
+	Let $\mathcal{H}_v$ denote the set of activity locations mapped to the road network node $v\in\mathcal{R}$.
+	\begin{equation}
+	\mathcal{H}_v=\{p^{-1}(v),\ \textrm{for}\ v\in\mathcal{R}\}
+	\end{equation}
+\end{enumerate}
+
+\subsection{Constructing the links}\label{subsec:link}
+\begin{enumerate}
+	\item[(a)] The primary distribution network is generated following the road network as a proxy. For the substation $s\in\mathcal{S}$, let $\mathcal{R}_s$ denote the induced subgraph consisting of the road nodes mapped to $s$. Therefore,
+	\begin{equation}\mathcal{R}_s=\mathcal{R}[\mathcal{V}_s]\end{equation}
+	and $\mathcal{T}_s$ be the tree rooted at $g(s)$ and constructed by a depth first search (DFS) from $g(s)$. The primary distribution network, therefore, is a forest and is given by
+	\begin{equation}\mathcal{F}=\{\mathcal{T}_s|s\in\mathcal{S}\}\end{equation}
+	
+	\item[(b)] For a node $v\in\mathcal{R}$ in the road network, first we identify the set of edges $E_v\subseteq\mathcal{L}$ connected to it. Let $E_v=\{e_1,e_2,\cdots,e_m\}$Thereafter, we identify the sets of activity locations as follows
+	\begin{equation}
+	\mathcal{A}_v=\bigg\{\mathcal{H}_v\bigcap\mathcal{H}_{e_1,A},\ \mathcal{H}_v\bigcap\mathcal{H}_{e_1,B},\ \mathcal{H}_v\bigcap\mathcal{H}_{e_2,A},\ \mathcal{H}_v\bigcap\mathcal{H}_{e_2,B},\ \cdots,\  \mathcal{H}_v\bigcap\mathcal{H}_{e_m,A},\ \mathcal{H}_v\bigcap\mathcal{H}_{e_m,B} \bigg\}
+	\end{equation}
+	We connect nodes in subsets of $\mathcal{A}_v$ in a chain fashion to obtain the secondary network.
+\end{enumerate}
