@@ -11,6 +11,7 @@ from math import sin, cos, sqrt, atan2, radians
 #%% Functions
 def MeasureDistance(Point1,Point2):
     '''
+    The format of each point is (longitude,latitude).
     '''
     # Approximate radius of earth in km
     R = 6373.0
