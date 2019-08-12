@@ -10,14 +10,10 @@ Authors: Dr Anil Vullikanti
 
 import networkx as nx
 import csv
-#import copy
 import numpy as np
-#from scipy.spatial import cKDTree
 from math import sin, cos, sqrt, atan2, radians
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, LineString
-#from joblib import Parallel, delayed
-#import multiprocessing as mp
 
 
 def MeasureDistance(Point1,Point2):

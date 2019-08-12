@@ -5,7 +5,12 @@ Created on Wed Sep 12 12:46:36 2018
 Authors: Dr Anil Vullikanti
          Dr Henning Mortveit
          Rounak Meyur
+
+Description: This library contains classes, methods etc to extract data from
+the noldor database with required credentials. 
 """
+
+from __future__ import print_function
 
 import sys
 import argparse
@@ -191,13 +196,13 @@ def get_files_from_db(homeact_out_fname, subpos_out_fname):
         conn = CreateConnection(args.username, args.password, args.host_name,
                                args.port_no, args.serv_name)
     except DBError as dbe :
-        print dbe.message
+        print (dbe.message)
         sys.exit(-1)
     
     try :
         c = CreateCursor(conn)
     except DBError as dbe :
-        print dbe.message
+        print (dbe.message)
         sys.exit(-1)
     
     
@@ -213,7 +218,7 @@ def get_files_from_db(homeact_out_fname, subpos_out_fname):
     try :
         (Home_Long_Lat,HomeID,Home_Zip) = ExtractInfo(c,Col_0,Col_1,Col_2,Col_3,table1,Cond1)
     except DBError as dbe :
-        print dbe.message
+        print (dbe.message)
         sys.exit(-1)
         
     
@@ -229,7 +234,7 @@ def get_files_from_db(homeact_out_fname, subpos_out_fname):
     try :
         (Actv_Long_Lat,ActvID,Actv_Zip) = ExtractInfo(c,Col_0,Col_1,Col_2,Col_3,table2,Cond2)
     except DBError as dbe :
-        print dbe.message
+        print (dbe.message)
         sys.exit(-1)
     
     
@@ -266,7 +271,7 @@ def get_files_from_db(homeact_out_fname, subpos_out_fname):
     try :
         (Substation_Long_Lat,SubsID,Subs_Zip) = ExtractInfo(c,Col_0,Col_1,Col_2,Col_3,table3,Cond3)
     except DBError as dbe :
-        print dbe.message
+        print (dbe.message)
         sys.exit(-1)
     
     

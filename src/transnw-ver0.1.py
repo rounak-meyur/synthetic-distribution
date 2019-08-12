@@ -10,6 +10,9 @@ Author: Rounak Meyur
 
 import sys,os
 import networkx as nx
+import matplotlib.pyplot as plt
+from math import sin, cos, sqrt, atan2, radians
+import cPickle as pkl
 
 
 # Get the different directory loaction into different variables
@@ -53,26 +56,43 @@ def UpdateNeighborVoltage(Graph,g,volt,genlist,ref_volt):
     return
 
 
+def MeasureDistance(Point1,Point2):
+    '''
+    '''
+    # Approximate radius of earth in km
+    R = 6373.0
+    
+    # Get the longitude and latitudes of the two points
+    lat1 = radians(Point1[1])
+    lon1 = radians(Point1[0])
+    lat2 = radians(Point2[1])
+    lon2 = radians(Point2[0])
+    
+    # Measure the long-lat difference
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    
+    # Calculate distance between points in km
+    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    distance = R * c
+    return distance
 
 
-sys.exit(0)
 #%% Determine voltage of edges
-edgevoltage_file = pathInp + 'Data-Rachel/' + 'Line_Length_Voltage.csv'
+edgevoltage_file = pathInp + 'Line_Length_Voltage.csv'
 f = open(edgevoltage_file,'r')
 edge_voltage_data = [e.strip('\n').split(',') for e in f.readlines()[1:]]
 f.close()
 edge_voltage = {int(e[0]):float(e[1]) if (e[1]!='-999999') and (e[1]!='NA') else 0.0 \
                 for e in edge_voltage_data}
-edge_length = {int(e[0]):float(e[2]) if (e[1]!='-999999') and (e[1]!='NA') else 0.0 \
-               for e in edge_voltage_data}
 
 
-edgelist_file = pathInp + 'Data-Rachel/' + 'Edge_List.csv'
+edgelist_file = pathInp + 'Edge_List.csv'
 f = open(edgelist_file,'r')
 edge_data = [e.strip('\n').split(',') for e in f.readlines()[1:]]
 f.close()
-attr_edge_voltage = {(int(e[1]),int(e[2]),str(e[0])):[edge_voltage[int(e[3])],\
-                     edge_length[int(e[3])]] for e in edge_data}
+attr_edge_voltage = {(int(e[1]),int(e[2]),str(e[0])):edge_voltage[int(e[3])] for e in edge_data}
 
 #%% Create Graph with voltage as an attribute
 G = nx.MultiGraph()
@@ -97,45 +117,61 @@ gen_type = {int(g[0]):g[2] for g in gen_data}
 genlist = dict_gen.keys()
 
 #%% Determine voltage of nodes
-#node_voltage = {nd: 0.0 for nd in dict_node}
-#for e in attr_edge_voltage:
-#    if (attr_edge_voltage[e] != 0.0):
-#        node_voltage[e[0]] = float(attr_edge_voltage[e])
-#        node_voltage[e[1]] = float(attr_edge_voltage[e])
-#
-## Base Generator Voltage Update
-#basegen = [g for g in genlist if gen_type[g] not in ['solar','wind','batteries','biomass']]
-#for g in basegen:
-#    if dict_gen[g] < 2.0: 
-#        node_voltage[g] = 4.16
-#        ref_volt = {1:69.0,2:115.0,3:138.0,4:230.0}
-#    elif dict_gen[g] < 100.0: 
-#        node_voltage[g] = 6.90
-#        ref_volt = {1:69.0,2:115.0,3:138.0,4:230.0}
-#    elif dict_gen[g] < 500.0: 
-#        node_voltage[g] = 13.8
-#        ref_volt = {1:115.0,2:138.0,3:230.0,4:345.0}
-#    else: 
-#        node_voltage[g] = 22.0
-#        ref_volt = {1:115.0,2:138.0,3:230.0,4:345.0}
-#    UpdateNeighborVoltage(G,g,node_voltage,genlist,ref_volt)
-#
-## Peak Generator Voltage Update
-#peakgen = [g for g in genlist if gen_type[g] in ['solar','wind','batteries','biomass']]
-#for g in peakgen:
-#    if dict_gen[g] < 2.0: 
-#        node_voltage[g] = 0.69
-#    elif dict_gen[g] < 300.0: 
-#        node_voltage[g] = 4.16
-#    else: 
-#        node_voltage[g] = 6.9
-#    ref_volt = {1:69.0,2:115.0,3:138.0,4:230.0}
-#    UpdateNeighborVoltage(G,g,node_voltage,genlist,ref_volt)
-#
-## check voltages
-#unknown_voltage = [k for k in node_voltage if node_voltage[k] == 0.0 and k not in genlist]
-#known_voltage = [k for k in node_voltage if node_voltage[k] != 0.0]
-#print "DONE"
+node_voltage = {nd: 0.0 for nd in dict_node}
+for e in attr_edge_voltage:
+    if (attr_edge_voltage[e] != 0.0):
+        node_voltage[e[0]] = float(attr_edge_voltage[e])
+        node_voltage[e[1]] = float(attr_edge_voltage[e])
+
+#%% Base Generator Voltage Update
+basegen = [g for g in genlist if gen_type[g] not in ['solar','wind','batteries','biomass']]
+for g in basegen:
+    if dict_gen[g] < 2.0: 
+        node_voltage[g] = 4.16
+        ref_volt = {1:69.0,2:115.0,3:138.0,4:230.0}
+    elif dict_gen[g] < 100.0: 
+        node_voltage[g] = 6.90
+        ref_volt = {1:69.0,2:115.0,3:138.0,4:230.0}
+    elif dict_gen[g] < 500.0: 
+        node_voltage[g] = 13.8
+        ref_volt = {1:115.0,2:138.0,3:230.0,4:345.0}
+    else: 
+        node_voltage[g] = 22.0
+        ref_volt = {1:115.0,2:138.0,3:230.0,4:345.0}
+    UpdateNeighborVoltage(G,g,node_voltage,genlist,ref_volt)
+
+#%% Peak Generator Voltage Update
+peakgen = [g for g in genlist if gen_type[g] in ['solar','wind','batteries','biomass']]
+for g in peakgen:
+    if dict_gen[g] < 2.0: 
+        node_voltage[g] = 0.69
+    elif dict_gen[g] < 300.0: 
+        node_voltage[g] = 4.16
+    else: 
+        node_voltage[g] = 6.9
+    ref_volt = {1:69.0,2:115.0,3:138.0,4:230.0}
+    UpdateNeighborVoltage(G,g,node_voltage,genlist,ref_volt)
+
+#%%
+unknown_voltage = [k for k in node_voltage if node_voltage[k] == 0.0 and k not in genlist]
+known_voltage = [k for k in node_voltage if node_voltage[k] != 0.0]
+print "DONE"
+
+#H = nx.MultiGraph()
+#H = nx.compose(H,G)
+#for k in known_voltage:
+#    H.add_edge(k,99999,'EXTRA')
+#L = {n:nx.shortest_path_length(H,source=99999,target=n)-1 \
+#     if nx.has_path(H,source=99999,target=n) else float('inf') \
+#     for n in unknown_voltage}
+
+
+#%%
+#f = open("volt_data.csv",'w')
+#for k in node_voltage:
+#    line = str(k)+','+str(dict_node[k][0])+','+str(dict_node[k][1])+','+str(node_voltage[k])+'\n'
+#    f.write(line)
+#f.close()
 
 
 

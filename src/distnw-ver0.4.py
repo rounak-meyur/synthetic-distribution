@@ -8,7 +8,6 @@ Author: Dr Anil Vullikanti
 
 
 import sys,os
-#import random as rnd
 import networkx as nx
 import numpy as np
 import time
@@ -25,7 +24,7 @@ sys.path.append(LibPath)
 import pyGenerateLinklib
 reload(pyGenerateLinklib)
 
-
+sys.exit(0)
 #%%
 if __name__ == "__main__":
     
