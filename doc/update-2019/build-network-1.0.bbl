@@ -1,0 +1,39 @@
+\begin{thebibliography}{1}
+
+\bibitem{overbye_101}
+K.~M. {Gegner}, A.~B. {Birchfield}, {Ti Xu}, K.~S. {Shetye}, and T.~J.
+  {Overbye}.
+\newblock {A Methodology for the Creation of Geographically Realistic Synthetic
+  Power Flow Models}.
+\newblock In {\em {2016 IEEE Power and Energy Conference at Illinois (PECI)}},
+  pages 1--6, Feb 2016.
+
+\bibitem{overbye_102}
+A.~B. {Birchfield}, K.~M. {Gegner}, T.~{Xu}, K.~S. {Shetye}, and T.~J.
+  {Overbye}.
+\newblock {Statistical Considerations in the Creation of Realistic Synthetic
+  Power Grids for Geomagnetic Disturbance Studies}.
+\newblock {\em {IEEE Transactions on Power Systems}}, 32(2):1502--1510, Mar
+  2017.
+
+\bibitem{navteq}
+{NAVTEQ}.
+\newblock {Title of NAVTEQ data set webpage}.
+\newblock \url{https://www.navteq.com}.
+\newblock Accessed:.
+
+\bibitem{eia_substations}
+{U.S. Department of Homeland Security}.
+\newblock {Electric Substations}.
+\newblock
+  \url{https://hifld-geoplatform.opendata.arcgis.com/datasets/electric-substations}.
+\newblock Updated: 2019-07-09.
+
+\bibitem{swapna_2018}
+S.~{Thorve}, S.~{Swarup}, A.~{Marathe}, Y.~{Chungbaek}, E.~K. {Nordberg}, and
+  M.~V. {Marathe}.
+\newblock {Simulating Residential Energy Demand in Urban and Rural Areas}.
+\newblock In {\em {2018 Winter Simulation Conference (WSC)}}, pages 548--559,
+  Dec 2018.
+
+\end{thebibliography}

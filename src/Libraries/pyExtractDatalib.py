@@ -16,6 +16,11 @@ import sys
 import argparse
 import cx_Oracle
 import pickle
+import numpy as np
+import pandas as pd
+import geopandas as gpd
+import networkx as nx
+from collections import namedtuple as nt
 
 
 # -----------------------------------------------------------------------------
@@ -37,7 +42,7 @@ class DBError(Error):
         self.expression = expression
         self.message = message
 
-
+#%% Oracle related functions
 # -----------------------------------------------------------------------------
 # Functions
 
@@ -289,26 +294,126 @@ def get_files_from_db(homeact_out_fname, subpos_out_fname):
     # -------------------------------------------------------------------------
     # Close connection with database
     conn.close()
+
+
+
+#%% Classes
+
+class Query:
+    """
+    """
+    def __init__(self,csvpath):
+        '''
+        '''
+        self.csvpath = csvpath
+        return
     
     
-def extract_power_data(input_csv_file):
-    '''
-    '''
-    f = open(input_csv_file,'r')
-    lines = f.readlines()[1:]
-    f.close()
-    L = [l.strip('\n').split(',') for l in lines]
-    HomeAct = {L[k][0]:[L[k][2:]] for k in range(len(L))}
+    def GetRoads(self,level=[3,4,5],thresh=10):
+        '''
+        Method to create a named tuple to store the road network data.
+        '''
+        df_all = pd.read_csv(self.csvpath+'road-graph.csv')
+        df_road = df_all.loc[df_all['level'].isin(level)]
+        df_cord = pd.read_csv(self.csvpath+'road-cord.csv')
+        
+        # Networkx graph construction
+        root = nx.from_pandas_edgelist(df_road,'source','target','level')
+        comps = [c for c in list(nx.connected_components(root)) if len(c)>thresh]
+        graph = nx.Graph()
+        for c in comps: graph=nx.compose(graph,root.subgraph(c))
+        
+        cords = df_cord.set_index('node').T.to_dict('list')
+        road = nt("road",field_names=["graph","cord"])
+        return road(graph=graph,cord=cords)
+    
+    
+    def GetSubstations(self):
+        '''
+        Method to create a named tuple to store the substation location data which 
+        is obtained from EIA database.
+        '''
+        df_cord = pd.read_csv(self.csvpath+'subs-cord.csv')
+        cords = df_cord.set_index('node').T.to_dict('list')
+        subs = nt("substation",field_names=["cord"])
+        return subs(cord=cords)
+    
+    
+    def GetHourlyDemand(self,inppath,filename,cordfile):
+        '''
+        '''
+        df_load = pd.read_csv(inppath+filename)
+        df_cord = pd.read_csv(inppath+cordfile,
+                                usecols=['HID','Longitude','Latitude'])
+        df_cord = df_cord[['HID','Longitude','Latitude']]
+        df_cord.to_csv(self.csvpath+'home-cord.csv',index=False)
+        df_demand = pd.read_csv(inppath+cordfile,usecols=['HID'])
+        #df_base = (df_load['hotWaterWH'] + df_load['standbyWH'])/24.0
+        df_base = (df_load['standbyWH'])/24.0
+        for i in range(1,25):
+            df_demand['hour'+str(i)] = df_load['P'+str(i)]+df_load['A'+str(i)]+df_base
+        df_demand.to_csv(self.csvpath+'home-load.csv',index=False)
+        return
+    
+    
+    def GetHomes(self):
+        '''
+        '''
+        df_home = pd.merge(pd.read_csv(self.csvpath+'home-cord.csv'),
+                           pd.read_csv(self.csvpath+'home-load.csv'),on='HID')
+        df_home['peak'] = pd.Series(np.max(df_home.iloc[:,3:].values,axis=1))
+        df_home['average'] = pd.Series(np.mean(df_home.iloc[:,3:].values,axis=1))
+        
+        home = nt("home",field_names=["cord","profile","peak","average"])
+        dict_cord = pd.read_csv(self.csvpath+'home-cord.csv').set_index('HID').T.to_dict('list')
+        dict_load = pd.read_csv(self.csvpath+'home-load.csv').set_index('HID').T.to_dict('list')
+        dict_peak = dict(zip(df_home.HID,df_home.peak))
+        dict_avg = dict(zip(df_home.HID,df_home.average))
+        homes = home(cord=dict_cord,profile=dict_load,peak=dict_peak,average=dict_avg)
+        
+        gdf_home = gpd.GeoDataFrame(df_home.loc[:,['HID','Longitude','Latitude','peak','average']],
+                                    geometry=gpd.points_from_xy(df_home.Longitude,
+                                                                df_home.Latitude))
+        return gdf_home,homes
+    
+    
+    def get_tsfr_to_link(self):
+        """
+        """
+        df_tsfr = pd.read_csv(self.csvpath+'tsfr2link.csv')
+        tsfr = nt("Transformers",field_names=["cord","link"])
+        dict_cord = dict([(t.TID, (t.longitude, t.latitude)) \
+                          for t in df_tsfr.itertuples()])
+        dict_link = dict([(t.TID, (t.source, t.target)) \
+                          for t in df_tsfr.itertuples()])
+        return tsfr(cord=dict_cord,link=dict_link)
+        
 
 
 
 
 
-
-
-
-
-
+class EIA:
+    """
+    """
+    def __init__(self,path,line_file="Electric_Power_Transmission_Lines.shp",
+                 sub_file="Electric_Substations.shp",state_file="states.shp"):
+        """
+        """
+        data_lines = gpd.read_file(path+line_file)
+        data_substations = gpd.read_file(path+sub_file)
+        data_states = gpd.read_file(path+state_file)
+        
+        state_polygon = list(data_states[data_states.STATE_ABBR == 
+                                 'VA'].geometry.items())[0][1]
+        self.subs = data_substations.loc[data_substations.geometry.within(state_polygon)]
+        self.lines = data_lines.loc[data_lines.geometry.intersects(state_polygon)]
+        
+        sub_list = self.subs['NAME'].values.tolist()
+        idx1 = [i for i,x in enumerate(self.lines['SUB_1'].values) if x not in sub_list]
+        idx2 = [i for i,x in enumerate(self.lines['SUB_2'].values) if x not in sub_list]
+        line_idx = list(set(idx1).union(set(idx2)))
+        self.lines.drop(self.lines.index[line_idx], inplace=True)
 
 
 

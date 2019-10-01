@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 29 08:41:09 2019
+Created on Mon Sep 30 11:01:21 2019
 
-Author: Rounak Meyur
+@author: rounak
 """
 
-
 from math import sin, cos, sqrt, atan2, radians
+from collections import namedtuple as nt
+import networkx as nx
+from networkx.algorithms.approximation.steinertree import steiner_tree as st_tree
+from itertools import combinations
 
 #%% Functions
 def MeasureDistance(Point1,Point2):
@@ -33,72 +36,173 @@ def MeasureDistance(Point1,Point2):
     return distance*1000
 
 
-
-
 #%% Classes
-class iBus(list):
+class Steiner:
     """
     """
-    def __init__(self,aList):
-        '''
-        A method to initialize the data for a bus element in the power network.
-        '''
-        super(iBus,self).__init__(aList)
-        self.__dict__['d'] = {'number':0, 'long':1, 'lat':2, 'kv':3, 'type':4}
-        self.__dict__['data'] = aList
+    def __init__(self,homes,roads,home_to_link):
+        """
+        """
+        self.home_cord = homes.cord
+        self.road_cord = roads.cord
+        self.link_to_home = {}
+        self.home_load = homes.average
+        self.road_to_home = {k:0.0 for k in list(roads.graph.nodes())}
+        for h in home_to_link:
+            if home_to_link[h] in self.link_to_home.keys():
+                self.link_to_home[home_to_link[h]].append(h)
+            else:
+                self.link_to_home[home_to_link[h]]=[h]
+        return
     
-    def __getitem__(self,key):
-        '''
-        A method to get item from class using the key defined in the constructor.
-        '''
-        if isinstance(key,str):
-            return self.data[self.d[key.lower()]]
+    
+    def separate_side(self,link):
+        """
+        Evaluates the groups of homes on either side of the link
+        """
+        homelist = self.link_to_home[link] if link in self.link_to_home\
+            else self.link_to_home[(link[1],link[0])]
+        points = [self.home_cord[h] for h in homelist]
+        (x1,y1) = self.road_cord[link[0]]
+        (x2,y2) = self.road_cord[link[1]]
+        eqn = [((x-x1)*(y2-y1))-((y-y1)*(x2-x1)) for (x,y) in points]
+        side = {}
+        for index,home in enumerate(homelist):
+            if eqn[index]>=0: side[home]=1
+            else: side[home]=-1
+        return side
+    
+    
+    def separate_node(self,link):
+        """
+        Evaluates the groups of homes based on nearness to link ends 
+        """
+        (x1,y1) = self.road_cord[link[0]]
+        (x2,y2) = self.road_cord[link[1]]
+        node1 = []; node2 = []
+        homelist = self.link_to_home[link] if link in self.link_to_home\
+            else self.link_to_home[(link[1],link[0])]
+        for home in homelist:
+            if MeasureDistance(self.road_cord[link[0]],self.home_cord[home])<=\
+                               MeasureDistance(self.road_cord[link[1]],self.home_cord[home]):
+                node1.append(home)
+            else:
+                node2.append(home)
+        return [node1,node2]
+    
+    
+    def complete_graph_from_list(self,L,create_using=None):
+        """
+        """
+        G = nx.Graph()
+        edges = combinations(L,2)
+        G.add_edges_from(edges)
+        return G
+    
+    
+    def create_dummy_graph(self,link,group,penalty=0.5):
+        """
+        """
+        node_maps = self.separate_node(link)
+        sides = self.separate_side(link)
+        root = link[group]
+        home_pts = node_maps[group]
+        if home_pts == []:
+            g = nx.Graph()
+            g.add_node(root)
+            node_pos = {root:self.road_cord[root]}
+            nx.set_node_attributes(g,node_pos,'cord')
+            return g
         else:
-            return self.data[key]
+            node_pos = {h:self.home_cord[h] for h in home_pts}
+            self.road_to_home[root] += sum([self.home_load[h] \
+                                           for h in home_pts])
+            if root not in home_pts:
+                node_pos[root] = self.road_cord[root]
+                sides[root] = 0
+            else:
+                print("Road node ID and Home ID matches!!! PROBLEM")
+            graph = self.complete_graph_from_list(home_pts)
+            new_edges = [(root,n) for n in home_pts]
+            graph.add_edges_from(new_edges)
+            nx.set_node_attributes(graph,node_pos,'cord')
+            edge_dist = {e:MeasureDistance(node_pos[e[0]],node_pos[e[1]])*\
+                         (1+penalty*abs(sides[e[0]]*sides[e[1]])*\
+                          abs(sides[e[0]]-sides[e[1]])) \
+                          for e in list(graph.edges())}
+            nx.set_edge_attributes(graph,edge_dist,'dist')
+            steiner = st_tree(graph,list(graph.nodes()),weight='dist')
+            return steiner
+
+
+
+class Spider:
+    """
+    """
+    def __init__(self,homes,tsfrs,roads,home_to_tsfr):
+        """
+        """
+        self.home_cord = homes.cord
+        self.home_load = homes.average
+        self.tsfr_cord = tsfrs.cord
+        self.road_cord = roads.cord
+        self.tsfr_link = tsfrs.link
+        self.tsfr_to_home = {}
+        self.tsfr_rating = {k:0.0 for k in tsfrs.cord}
+        for h in home_to_tsfr:
+            if home_to_tsfr[h] in self.tsfr_to_home.keys():
+                self.tsfr_to_home[home_to_tsfr[h]].append(h)
+            else:
+                self.tsfr_to_home[home_to_tsfr[h]]=[h]
+        return
     
-    def __setitem__(self,key,value):
-        '''
-        A method to get set value for a particular attribute of the instance.
-        '''
-        if isinstance(key,str):
-            self.data[self.d[key.lower()]] = value
+    
+    def separate_side(self,link,homelist):
+        """
+        Evaluates the groups of homes on either side of the link
+        """
+        points = [self.home_cord[h] for h in homelist]
+        (x1,y1) = self.road_cord[link[0]]
+        (x2,y2) = self.road_cord[link[1]]
+        eqn = [((x-x1)*(y2-y1))-((y-y1)*(x2-x1)) for (x,y) in points]
+        side = {}
+        for index,home in enumerate(homelist):
+            if eqn[index]>=0: side[home]=1
+            else: side[home]=-1
+        return side
+    
+    
+    def complete_graph_from_list(self,L,create_using=None):
+        """
+        """
+        G = nx.Graph()
+        edges = combinations(L,2)
+        G.add_edges_from(edges)
+        return G
+    
+    
+    def generate_spider(self,tsfr,penalty=0.5):
+        """
+        """
+        homes_mapped = self.tsfr_to_home[tsfr]
+        link = self.tsfr_link[tsfr]
+        sides = self.separate_side(link,homes_mapped)
+        node_pos = {h:self.home_cord[h] for h in homes_mapped}
+        self.tsfr_rating[tsfr] = sum([self.home_load[h] for h in homes_mapped])
+        if tsfr not in homes_mapped:
+            node_pos[tsfr] = self.tsfr_cord[tsfr]
+            sides[tsfr] = 0
         else:
-            self.data[key] = value
-
-
-
-class Bus(list):
-    """
-    """
-    def __getitem__(self,key):
-        '''
-        Returns the bus instance corresponding to key
-        '''
-        return iBus(self.data[key])
+            print("Tsfr node ID and Home ID matches!!! PROBLEM")
+        graph = self.complete_graph_from_list(homes_mapped)
+        new_edges = [(tsfr,n) for n in homes_mapped]
+        graph.add_edges_from(new_edges)
+        nx.set_node_attributes(graph,node_pos,'cord')
+        edge_dist = {e:MeasureDistance(node_pos[e[0]],node_pos[e[1]])*\
+                     (1+penalty*abs(sides[e[0]]*sides[e[1]])*\
+                      abs(sides[e[0]]-sides[e[1]])) \
+                      for e in list(graph.edges())}
+        nx.set_edge_attributes(graph,edge_dist,'dist')
+        spider = st_tree(graph,list(graph.nodes()),weight='dist')
+        return spider
     
-    def __iter__(self):
-        '''
-        Returns as class objects during iterations
-        '''
-        for p in self.data:
-            yield iBus(p)
-    
-    def __init__(self,csvfile):
-        '''
-        '''
-        f = open(csvfile,'r')
-        cdata = [line.strip('\n').split(',') for line in f.readlines()]
-        f.close()
-        # Append each line of data one at a time
-        self.data = []
-        dicref = []
-        for k in range(1,len(cdata)):
-            L = [int(cdata[k][0]),int(cdata[k][1]),float(cdata[k][2]),
-                 float(cdata[k][3]),float(cdata[k][4]),float(cdata[k][5]),
-                 float(cdata[k][6]),float(cdata[k][7]),float(cdata[k][8]),
-                 float(cdata[k][9]),float(cdata[k][10]),float(cdata[k][11]),
-                 float(cdata[k][12])]
-            self.__dict__['data'].append(L)
-            dicref.append(L[0])
-        super(Bus,self).__init__(self.__dict__['data'])
-        self.identify = dict(zip(dicref,range(len(cdata))))

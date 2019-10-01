@@ -24,7 +24,8 @@ sys.path.append(libPath)
 place_name = "Blacksburg, Virginia, USA"
 
 graph = ox.graph_from_place(place_name)
+fig = plt.figure(figsize=(10,10))
 fig, ax = ox.plot_graph(graph)
 
-area = ox.gdf_from_place(place_name)
-buildings = ox.buildings_from_place(place_name)
+#area = ox.gdf_from_place(place_name)
+#buildings = ox.buildings_from_place(place_name)
