@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Feb 27 10:20:45 2019
+Created on Mon Aug 19 19:57:15 2019
 
-Author: Dr Anil Vullikanti
-        Rounak Meyur
-        
-Description: Generates primary distribution network for Montgomery county
+Author: Rounak Meyur
+Description: This program approaches the set cover problem to find optimal/sub-
+optimal placement of transformers along the road network graph. Thereafter it 
+creates a spider network to cover all the residential buildings. The spider net
+is a forest of trees rooted at the transformer nodes.
+This program creates the spider network using heuristic based as well as power
+flow based optimization setup and compares them to better understand the 
+differences.
 """
 
-
 import sys,os
-import time
-import numpy as np
-import networkx as nx
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import networkx as nx
 
 
 workPath = os.getcwd()
@@ -26,8 +26,10 @@ figPath = workPath + "/figs/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
-from pyBuildNetworklib import Steiner
-from pyMapElementslib import MapLink
+from pyBuildNetworklib import Spider
+
+#from pyMapElementslib import MapLink
+#MapLink(roads).map_points(homes,path=csvPath,name='home')
 
 #%%
 def get_neighbors(graph,u,v,hops=2):
@@ -42,79 +44,72 @@ def get_neighbors(graph,u,v,hops=2):
     return nlist
 
 
-#%% Main function goes here
-    
-start = time.time()
+#%% Initialization of data sets and mappings
 q_object = Query(csvPath)
-subs = q_object.GetSubstations()
 gdf_home,homes = q_object.GetHomes()
 roads = q_object.GetRoads()
 
-
-#obj_MapLink = MapLink(roads)
-#obj_MapLink.map_point(homes,path=csvPath,name='home')
 df_hmap = pd.read_csv(csvPath+'home2link.csv')
 H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
+spider_obj = Spider(homes,roads,H2Link)
+L2Home = spider_obj.link_to_home
 
-steiner_obj = Steiner(homes,roads,H2Link)
-L2Home = steiner_obj.link_to_home
+#%% Check for a random link
+import random
+links = [l for l in L2Home if 20<=len(L2Home[l])<=45]
+link = random.choice(links)
+#link = (171514360, 979565325)
+link = (171524810, 918459968)
+homelist = L2Home[link]
 
-
-#%% Check on a sample link
-#links = [k for k in list(L2Home.keys()) if len(L2Home[k])>0]
-#
-#n1,n2 = links[np.random.choice(range(len(links)))]
-#rnodes = get_neighbors(roads.graph,n1,n2)
-#subgraph = nx.subgraph(roads.graph,rnodes)
-#edges = [e for e in list(subgraph.edges()) \
-#         if e in L2Home or (e[1],e[0]) in L2Home]
-
-edges = [k for k in list(L2Home.keys()) if len(L2Home[k])>0]
-
-fig = plt.figure(figsize=(16,16))
+#%% Plot the Delaunay Triangulation
+import numpy as np
+from scipy.spatial import Delaunay
+H,T = spider_obj.get_nodes(link,minsep=50)
+points = np.array([[homes.cord[h][0],homes.cord[h][1]] for h in H])
+tri = Delaunay(points)
+fig = plt.figure(figsize=(15,8))
 ax = fig.add_subplot(111)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=edges,ax=ax,
-                       edge_color='k',width=0.5)
+nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax,
+                       width=2.5,edge_color='k')
+ax.scatter([homes.cord[h][0] for h in H],[homes.cord[h][1] for h in H],c='r',
+           s=25.0,marker='^')
+ax.scatter([t[0] for t in list(T.values())],[t[1] for t in list(T.values())],
+            c='b',s=35.0,marker='s')
+ax.triplot(points[:,0], points[:,1], tri.simplices.copy())
+ax.set_xlabel("Longitude",fontsize=15)
+ax.set_ylabel("Latitude",fontsize=15)
+ax.set_title("Residences mapped to a link and probable locations of transformers along the link",fontsize=15)
+#sys.exit(0)
+#%% Create secondary distribution network as a forest of disconnected trees
+#forest = spider_obj.generate_optimalpf_topology(link,minsep=50)
+#pos_nodes = nx.get_node_attributes(forest,'cords')
+#fig1 = plt.figure(figsize=(15,8))
+#ax1 = fig1.add_subplot(111)
+#nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax1,
+#                       edge_color='k',width=2.5)
+#nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
+#                 ax=ax1,edge_color='r',width=1.0,with_labels=False,
+#                 node_size=25.0)
+#
+#ax1.set_xlabel("Longitude",fontsize=15)
+#ax1.set_ylabel("Latitude",fontsize=15)
+#ax1.set_title("Secondary distribution network generated for the link with power flow constraints",fontsize=15)
+#
+#sys.exit(0)
+#%% Create secondary distribution network as a forest of disconnected trees
+forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,k=2,hops=5)
+pos_nodes = nx.get_node_attributes(forest,'cords')
+fig2 = plt.figure(figsize=(15,8))
+ax2 = fig2.add_subplot(111)
+nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax2,
+                       edge_color='k',width=2.5)
+nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
+                 ax=ax2,edge_color='r',width=1.5,with_labels=False,
+                 node_size=25.0)
+ax2.set_xlabel("Longitude",fontsize=15)
+ax2.set_ylabel("Latitude",fontsize=15)
+ax2.set_title("Secondary distribution network generated for the link with heuristics"+\
+              "(maximum degree of 2, maximum leg length of 5)",fontsize=15)
 
-for sample_link in edges:
-    sample_homes = L2Home[sample_link] \
-        if sample_link in L2Home else L2Home[(sample_link[1],sample_link[0])]
-
-    ga = steiner_obj.create_dummy_graph(sample_link,group=0,penalty=0.5)
-    gb = steiner_obj.create_dummy_graph(sample_link,group=1,penalty=0.5)
-
-    node_posa = nx.get_node_attributes(ga,'cord')
-    nx.draw_networkx(ga,pos=node_posa,ax=ax,edge_color='r',with_labels=False,
-                 node_size=1,node_color='r')
-    node_posb = nx.get_node_attributes(gb,'cord')
-    nx.draw_networkx(gb,pos=node_posb,ax=ax,edge_color='b',with_labels=False,
-                 node_size=1,node_color='b')
-
-end = time.time()
-print ("Time taken:",end-start)
-sys.exit(0)
-
-#%%
-output = steiner_obj.road_to_home
-ratings = {k:output[k] for k in output if output[k]!=0.0 and output[k]<=21e3}
-ratings = [r/1000.0 for r in list(ratings.values())]
-total_load = sum(list(homes.average.values()))
 plt.show()
-
-
-f=plt.figure(figsize=(10,6))
-ax=f.add_subplot(111)
-ax.hist(ratings,color='seagreen',ec='black')
-ax.set_xlabel('Rating of transformer (kVA)',fontsize=15)
-ax.set_ylabel('Number of distribution transformers',fontsize=15)
-ax.set_title('Histogram of distribution transformer ratings',fontsize=15)
-ax.tick_params(axis='x',labelsize=15)
-ax.tick_params(axis='y',labelsize=15)
-
-
-
-
-
-
-
-

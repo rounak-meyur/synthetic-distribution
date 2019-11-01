@@ -8,7 +8,7 @@ Author: Rounak Meyur
 import os
 import numpy as np
 import pandas as pd
-from math import sin, cos, sqrt, atan2, radians
+from geographiclib.geodesic import Geodesic
 from shapely.geometry import Point,LineString
 from pyqtree import Index
 from scipy.spatial import Voronoi,cKDTree,voronoi_plot_2d
@@ -19,28 +19,14 @@ import networkx as nx
 from pyImgHelperlib import ImageHelper
 
 #%% Functions
-def MeasureDistance(Point1,Point2):
+def MeasureDistance(pt1,pt2):
     '''
     The format of each point is (longitude,latitude).
     '''
-    # Approximate radius of earth in km
-    R = 6373.0
-    
-    # Get the longitude and latitudes of the two points
-    lat1 = radians(Point1[1])
-    lon1 = radians(Point1[0])
-    lat2 = radians(Point2[1])
-    lon2 = radians(Point2[0])
-    
-    # Measure the long-lat difference
-    dlon = lon2 - lon1
-    dlat = lat2 - lat1
-    
-    # Calculate distance between points in km
-    a = sin(dlat / 2)**2 + cos(lat1) * cos(lat2) * sin(dlon / 2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    distance = R * c
-    return distance*1000
+    lon1,lat1 = pt1
+    lon2,lat2 = pt2
+    geod = Geodesic.WGS84
+    return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
 
 
 
@@ -113,7 +99,7 @@ class MapLink:
         unmapped = [p for p in Map2Link if Map2Link[p]==None]
         for p in unmapped:
             del Map2Link[p]
-            if projection: del Proj[h]
+            #if projection: del Proj[h]
         
         # Save as a csv file
         df_map = pd.DataFrame.from_dict(Map2Link,orient='index',
@@ -132,12 +118,11 @@ class MapLink:
 class MapSub2Road:
     """
     """
-    def __init__(self,subs,roads,road_to_home):
+    def __init__(self,subs,roads):
         """
         """
         self.roads = roads
         self.subs = subs
-        self.RW = [r for r in road_to_home if road_to_home[r]!=[]]
         self.RW_pts = [(roads.cord[r][0],roads.cord[r][1]) for r in self.RW]
         self.sub_pts = list(subs.cord.values())
         
@@ -154,7 +139,8 @@ class MapSub2Road:
         voronoi_kdtree = cKDTree(self.sub_pts)
         _, RW_regions = voronoi_kdtree.query(self.RW_pts, k=1)
         indS2R = [np.argwhere(i==RW_regions)[:,0] for i in np.unique(RW_regions)]
-        self.S2Road = {sub_region[i]:[self.RW[j] for j in indS2R[i]] for i in range(len(indS2R))}
+        self.S2Road = {sub_region[i]:[self.RW[j] for j in indS2R[i]] \
+                       for i in range(len(indS2R))}
         
         S2RNear = {}
         for sub in self.S2Road:
@@ -182,8 +168,12 @@ class MapSub2Road:
 
 class Cluster:
     """
+    Performs clustering of resedential building coordinates to identify potential
+    groups for transformer placement. The transformer is to be placed either at
+    the centroid of the cluster or at the projected point from the centroid on
+    the nearest road link.
     """
-    def __init__(self,homes,roads):
+    def __init__(self,homes,roads,k=600):
         """
         Perform weighted k-means clustering of the homes whre the weights are the 
         average hourly load demand at each home.
@@ -191,19 +181,21 @@ class Cluster:
         """
         self.X = np.array(list(homes.cord.values()))
         self.w = np.array(list(homes.average.values()))
-        self.cluster = self.__clusters()
+        self.cluster = self.__clusters(num_clusters=k)
         self.roads = roads
         self.home_id = list(homes.cord.keys())
         return
     
     
-    def __clusters(self,Pmax=100e3,kmax=600):
+    def __clusters(self,num_clusters=600):
         """
+        Perform weighted k-means clustering of the residential buildings with
+        the loads as the weight of each building node.
+        num_clusters: number of clusters
+        At this stage, the number of clusters are specified but later on can be
+        automated by an iterative process.
         """
-        #total_demand = np.sum(self.w)
-        #k_min = int(max(total_demand/Pmax,1))-1
-        kmin = 600
-        k_clusters = int((kmin+kmax)/2)
+        k_clusters = num_clusters
         # Perform k-means clustering with corresponding weights
         cluster = k_means(self.X,n_clusters=k_clusters,
                           sample_weight=self.w,return_n_iter=True)
@@ -212,6 +204,9 @@ class Cluster:
     
     def get_tsfr(self,path=os.getcwd()):
         """
+        Gets the location of the transformer on the nearest road link and stores
+        in a csv file with the transformer id.
+        path: directory path for the csv file to be saved
         """
         centroid = {k:self.cluster[0][k] for k in range(len(self.cluster[0]))}
         tsfr = namedtuple("Transformers",field_names=["cord"])
@@ -233,6 +228,8 @@ class Cluster:
     
     def plot_clusters(self,path=os.getcwd()):
         """
+        Plots the clusters in a figure and stores it in the specified directory
+        path: directory path for the figure to be saved
         """
         fig = plt.figure(figsize=(13,10))
         ax = fig.add_subplot(111)

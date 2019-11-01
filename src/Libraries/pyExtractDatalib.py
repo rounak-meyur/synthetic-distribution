@@ -387,6 +387,18 @@ class Query:
         dict_link = dict([(t.TID, (t.source, t.target)) \
                           for t in df_tsfr.itertuples()])
         return tsfr(cord=dict_cord,link=dict_link)
+    
+    
+    def GetTransformers(self):
+        """
+        """
+        df_tsfr = pd.read_csv(self.csvpath+'tsfr-cord-load.csv')
+        tsfr = nt("Transformers",field_names=["cord","load","graph"])
+        dict_cord = dict([(t.TID, (t.long, t.lat)) for t in df_tsfr.itertuples()])
+        dict_load = dict([(t.TID, t.load) for t in df_tsfr.itertuples()])
+        df_tsfr_edges = pd.read_csv(self.csvpath+'tsfr-net.csv')
+        g = nx.from_pandas_edgelist(df_tsfr_edges)
+        return tsfr(cord=dict_cord,load=dict_load,graph=g)
         
 
 
@@ -414,13 +426,6 @@ class EIA:
         idx2 = [i for i,x in enumerate(self.lines['SUB_2'].values) if x not in sub_list]
         line_idx = list(set(idx1).union(set(idx2)))
         self.lines.drop(self.lines.index[line_idx], inplace=True)
-
-
-
-
-
-
-
 
 
 

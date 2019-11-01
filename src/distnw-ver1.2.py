@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Feb 27 10:20:45 2019
+Created on Mon Aug 19 19:57:15 2019
 
-Author: Dr Anil Vullikanti
-        Rounak Meyur
-        
-Description: Generates primary distribution network for Montgomery county
+Author: Rounak Meyur
+Description: This program approaches the set cover problem to find optimal/sub-
+optimal placement of transformers along the road network graph. Thereafter it 
+creates a spider network to cover all the residential buildings. The spider net
+is a forest of trees rooted at the transformer nodes. The program creates the
+network using design heuristics and checks power flow to identify voltage limit
+violations. The voltage profile is plotted for different heuristic choices.
 """
 
-
 import sys,os
-import time
-import numpy as np
-import networkx as nx
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import numpy as np
 
 
 workPath = os.getcwd()
@@ -28,55 +27,50 @@ sys.path.append(libPath)
 from pyExtractDatalib import Query
 from pyBuildNetworklib import Spider
 
-#%%
-def get_neighbors(graph,u,v,hops=2):
-    """
-    """
-    nlist = [u,v]
-    for i in range(hops):
-        temp = []
-        for n in nlist:
-            temp.extend(list(graph.neighbors(n)))
-        nlist = list(set(temp))
-    return nlist
+#from pyMapElementslib import MapLink
+#MapLink(roads).map_points(homes,path=csvPath,name='home')
 
 
-#%% Main function goes here
-    
-start = time.time()
+#%% Initialization of data sets and mappings
 q_object = Query(csvPath)
 gdf_home,homes = q_object.GetHomes()
 roads = q_object.GetRoads()
 
-#%% Create the mapping between homes and transformers/links
-#from pyMapElementslib import Cluster
-#cluster_obj = Cluster(homes,roads)
-#cluster_obj.get_tsfr(path=csvPath)
-#print("Clustering done in",cluster_obj.cluster[3],"iterations.")
-#f = cluster_obj.plot_clusters(path=figPath)
+df_hmap = pd.read_csv(csvPath+'home2link.csv')
+H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
+spider_obj = Spider(homes,roads,H2Link)
+L2Home = spider_obj.link_to_home
 
-#%% Create network connection spider networks
-tsfrs = q_object.get_tsfr_to_link()
-df_hmap = pd.read_csv(csvPath+'home2tsfr.csv')
-H2Tsfr = dict([(t.HID, t.TID) for t in df_hmap.itertuples()])
-
-edges = list(tsfrs.link.values())
-
-fig = plt.figure(figsize=(16,16))
-ax = fig.add_subplot(111)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=edges,ax=ax,
-                       edge_color='k',width=0.5)
+#%% Check for a random link
+import random
+links = [l for l in L2Home if 20<=len(L2Home[l])<=45]
+link = random.choice(links)
+#link = (171514360, 979565325)
+link = (171524810, 918459968)
+homelist = L2Home[link]
 
 
-spider_obj = Spider(homes,tsfrs,roads,H2Tsfr)
-for tsf in list(tsfrs.cord.keys()):
-    S = spider_obj.generate_spider(tsf)
-    node_pos = nx.get_node_attributes(S,'cord')
-    nx.draw_networkx(S,pos=node_pos,ax=ax,edge_color='r',with_labels=False,
-                 node_size=1,node_color='r')
+#%% Create secondary distribution network as a forest of disconnected trees
+dict_vol = {h:[] for h in homelist}
+for hop in range(4,12):
+    forest,tsfr = spider_obj.generate_optimal_topology(link,minsep=50,k=2,hops=hop)
+    volts = spider_obj.checkpf(forest,tsfr)
+    for h in homelist: dict_vol[h].append(volts[h])
 
-plt.show()
+
 #%%
-end = time.time()
-print ("Time taken:",end-start)
-sys.exit(0)
+data = np.array(list(dict_vol.values()))
+homeID = [str(h) for h in list(dict_vol.keys())]
+fig = plt.figure(figsize=(10,6))
+ax = fig.add_subplot(111)
+ax.plot(data,'o-')
+ax.set_xticks(range(len(homelist)))
+ax.set_xticklabels(homeID)
+ax.tick_params(axis='x',rotation=90)
+ax.set_xlabel("Residential Building IDs",fontsize=15)
+ax.set_ylabel("Voltage level in pu",fontsize=15)
+ax.legend(labels=['max depth='+str(i) for i in range(4,12)])
+ax.set_title("Voltage profile at residential nodes in the generated forest",
+             fontsize=15)
+
+print("DONE")

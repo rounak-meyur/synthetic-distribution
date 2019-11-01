@@ -1,21 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Feb 27 10:20:45 2019
+Created on Mon Aug 19 19:57:15 2019
 
-Author: Dr Anil Vullikanti
-        Rounak Meyur
-        
-Description: Generates primary distribution network for Montgomery county
+Author: Rounak Meyur
+Description: This program approaches the set cover problem to find optimal/sub-
+optimal placement of transformers along the road network graph. Thereafter it 
+creates a spider network to cover all the residential buildings. The spider net
+is a forest of trees rooted at the transformer nodes.
+
+The output of the program are the following:
+    1. secondary network which is a forest of trees. The graph is output in a 
+    .txt file in the temp directory
+    2. list of transformers with the load and spatial coordinates in csv dir
+    3. list of edges in the primary network formed by road nodes and transformers
 """
 
-
 import sys,os
-import time
-import numpy as np
-import networkx as nx
 import pandas as pd
-import matplotlib.pyplot as plt
-
+import networkx as nx
+import datetime
 
 
 workPath = os.getcwd()
@@ -23,99 +26,89 @@ inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
 figPath = workPath + "/figs/"
+tmpPath = workPath + "/temp/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
-from pyBuildNetworklib import Spider,Steiner
+from pyBuildNetworklib import Spider
+from pyBuildNetworklib import MeasureDistance as dist
+#from pyMapElementslib import MapLink
+#MapLink(roads).map_points(homes,path=csvPath,name='home')
 
-#%%
-def get_neighbors(graph,u,v,hops=2):
-    """
-    """
-    nlist = [u,v]
-    for i in range(hops):
-        temp = []
-        for n in nlist:
-            temp.extend(list(graph.neighbors(n)))
-        nlist = list(set(temp))
-    return nlist
-
-
-#%% Main function goes here
-    
-start = time.time()
+#%% Initialization of data sets and mappings
 q_object = Query(csvPath)
 gdf_home,homes = q_object.GetHomes()
 roads = q_object.GetRoads()
 
-#%% Create network connection spider networks
-tsfrs = q_object.get_tsfr_to_link()
-df_hmap = pd.read_csv(csvPath+'home2tsfr.csv')
-H2Tsfr = dict([(t.HID, t.TID) for t in df_hmap.itertuples()])
-spider_obj = Spider(homes,tsfrs,roads,H2Tsfr)
-
-tsfr_list = list(tsfrs.cord.keys())
-tsf = tsfr_list[np.random.choice(range(len(tsfr_list)))]
-link = [tsfrs.link[tsf]]
-
-fig = plt.figure(figsize=(24,12))
-ax1 = fig.add_subplot(121)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=link,ax=ax1,
-                       edge_color='k',width=0.5)
-S = spider_obj.generate_spider(tsf)
-node_pos = nx.get_node_attributes(S,'cord')
-nx.draw_networkx(S,pos=node_pos,ax=ax1,edge_color='r',with_labels=False,
-                 node_size=10,node_color='r')
-
-
-#%% Create network connection Steiner connections
 df_hmap = pd.read_csv(csvPath+'home2link.csv')
 H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
+spider_obj = Spider(homes,roads,H2Link)
+L2Home = spider_obj.link_to_home
+links = [l for l in L2Home if 0<len(L2Home[l])<=70]
 
-steiner_obj = Steiner(homes,roads,H2Link)
-L2Home = steiner_obj.link_to_home
+#%%
+import time
+start_time = time.time()
+prefix = '51121'
+suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
+network = ''
+count = 100000
+dict_tsfr = {}
+edgelist = []
+for link in links:
+    # initialize
+    rename = {} # to rename the transformers with node IDs
+    tsfrlist = [] # to list the transformers
+    
+    # Solve the optimization problem and generate forest
+    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,
+                                                        k=2,hops=5)
+    cord = nx.get_node_attributes(forest,'cord')
+    load = nx.get_node_attributes(forest,'load')
+    
+    # Iterate over nodes to record transformers
+    for n in sorted(list(forest.nodes())):
+        if n in roots:
+            dict_tsfr[int(prefix+str(count))] = [cord[n][0],cord[n][1],load[n]]
+            rename[n] = int(prefix+str(count))
+            tsfrlist.append(int(prefix+str(count)))
+            count += 1
+    
+    # Get edgelist for primary network design
+    start_tsf = dict_tsfr[tsfrlist[0]][:2]
+    if dist(start_tsf,roads.cord[link[0]])<dist(start_tsf,roads.cord[link[1]]):
+        start = link[0]; end = link[1]
+    else:
+        start = link[1]; end = link[0]
+    nodes = [start]+tsfrlist+[end]
+    g = nx.Graph()
+    g.add_path(nodes)
+    edgelist += list(g.edges())
+    
+    # Iterate over edges to record secondary network
+    for e in list(forest.edges()):
+        node1 = str(rename[e[0]]) if e[0] in roots else str(e[0])
+        type1 = 'T' if e[0] in roots else 'H'
+        cord1a = str(cord[e[0]][0])
+        cord1b = str(cord[e[0]][1])
+        node2 = str(rename[e[1]]) if e[1] in roots else str(e[1])
+        type2 = 'T' if e[1] in roots else 'H'
+        cord2a = str(cord[e[1]][0])
+        cord2b = str(cord[e[1]][1])
+        network += ' '.join([node1,type1,cord1a,cord1b,
+                             node2,type2,cord2a,cord2b])+'\n'
+    
+end_time = time.time()
 
+#%% Save required data
+f_network = open(tmpPath+"sec-dist"+suffix+".txt",'w')
+f_network.write(network)
+f_network.close()
+df = pd.DataFrame(edgelist,columns=['source','target'])
+df.to_csv(csvPath+'tsfr-net.csv',index=False)
 
-ax2 = fig.add_subplot(122)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=link,ax=ax2,
-                       edge_color='k',width=0.5)
+df = pd.DataFrame.from_dict(dict_tsfr,orient='index',
+                            columns=['long','lat','load'])
+df.to_csv(csvPath+'tsfr-cord-load.csv')
 
-sample_link = link[0]
-sample_homes = L2Home[sample_link]\
-        if sample_link in L2Home else L2Home[(sample_link[1],sample_link[0])]
-
-ga = steiner_obj.create_dummy_graph(sample_link,group=0,penalty=0.5)
-gb = steiner_obj.create_dummy_graph(sample_link,group=1,penalty=0.5)
-
-node_posa = nx.get_node_attributes(ga,'cord')
-nx.draw_networkx(ga,pos=node_posa,ax=ax2,edge_color='r',with_labels=False,
-             node_size=10,node_color='r')
-node_posb = nx.get_node_attributes(gb,'cord')
-nx.draw_networkx(gb,pos=node_posb,ax=ax2,edge_color='r',with_labels=False,
-             node_size=10,node_color='r')
-
-plt.show()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+print("DONE")
