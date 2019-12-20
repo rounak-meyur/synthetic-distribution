@@ -309,7 +309,7 @@ class Query:
         return
     
     
-    def GetRoads(self,level=[3,4,5],thresh=10):
+    def GetRoads(self,level=[1,2,3,4,5],thresh=10):
         '''
         Method to create a named tuple to store the road network data.
         '''
@@ -375,18 +375,6 @@ class Query:
                                     geometry=gpd.points_from_xy(df_home.Longitude,
                                                                 df_home.Latitude))
         return gdf_home,homes
-    
-    
-    def get_tsfr_to_link(self):
-        """
-        """
-        df_tsfr = pd.read_csv(self.csvpath+'tsfr2link.csv')
-        tsfr = nt("Transformers",field_names=["cord","link"])
-        dict_cord = dict([(t.TID, (t.longitude, t.latitude)) \
-                          for t in df_tsfr.itertuples()])
-        dict_link = dict([(t.TID, (t.source, t.target)) \
-                          for t in df_tsfr.itertuples()])
-        return tsfr(cord=dict_cord,link=dict_link)
     
     
     def GetTransformers(self):

@@ -45,8 +45,8 @@ H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
 spider_obj = Spider(homes,roads,H2Link)
 L2Home = spider_obj.link_to_home
 links = [l for l in L2Home if 0<len(L2Home[l])<=70]
-
-#%%
+# sys.exit(0)
+#%% Create secondary network
 import time
 start_time = time.time()
 prefix = '51121'
@@ -61,8 +61,7 @@ for link in links:
     tsfrlist = [] # to list the transformers
     
     # Solve the optimization problem and generate forest
-    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,
-                                                        k=2,hops=5)
+    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
     cord = nx.get_node_attributes(forest,'cord')
     load = nx.get_node_attributes(forest,'load')
     
@@ -82,7 +81,7 @@ for link in links:
         start = link[1]; end = link[0]
     nodes = [start]+tsfrlist+[end]
     g = nx.Graph()
-    g.add_path(nodes)
+    nx.add_path(g,nodes)
     edgelist += list(g.edges())
     
     # Iterate over edges to record secondary network

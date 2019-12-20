@@ -42,11 +42,11 @@ spider_obj = Spider(homes,roads,H2Link)
 L2Home = spider_obj.link_to_home
 
 #%% Check for a random link
-import random
-links = [l for l in L2Home if 20<=len(L2Home[l])<=45]
-link = random.choice(links)
+# import random
+links = [l for l in L2Home if 100<=len(L2Home[l])<=150]
+link = links[0]
 #link = (171514360, 979565325)
-link = (171524810, 918459968)
+# link = (171524810, 918459968)
 homelist = L2Home[link]
 
 

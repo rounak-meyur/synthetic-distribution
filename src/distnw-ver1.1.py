@@ -17,6 +17,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
 
+import random
+import numpy as np
+from scipy.spatial import Delaunay
+from matplotlib.lines import Line2D
+
 
 workPath = os.getcwd()
 inpPath = workPath + "/input/"
@@ -28,9 +33,9 @@ sys.path.append(libPath)
 from pyExtractDatalib import Query
 from pyBuildNetworklib import Spider
 
-#from pyMapElementslib import MapLink
-#MapLink(roads).map_points(homes,path=csvPath,name='home')
-
+# from pyMapElementslib import MapLink
+# MapLink(roads).map_point(homes,path=csvPath,name='home')
+# sys.exit(0)
 #%%
 def get_neighbors(graph,u,v,hops=2):
     """
@@ -47,69 +52,76 @@ def get_neighbors(graph,u,v,hops=2):
 #%% Initialization of data sets and mappings
 q_object = Query(csvPath)
 gdf_home,homes = q_object.GetHomes()
-roads = q_object.GetRoads()
+roads = q_object.GetRoads(level=[1,2,3,4,5])
+
 
 df_hmap = pd.read_csv(csvPath+'home2link.csv')
 H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
 spider_obj = Spider(homes,roads,H2Link)
 L2Home = spider_obj.link_to_home
 
+
+
 #%% Check for a random link
-import random
-links = [l for l in L2Home if 20<=len(L2Home[l])<=45]
+links = [l for l in L2Home if 40<len(L2Home[l])<=50]
+# sys.exit(0)
 link = random.choice(links)
 #link = (171514360, 979565325)
-link = (171524810, 918459968)
-homelist = L2Home[link]
+# link = (171524810, 918459968)
 
 #%% Plot the Delaunay Triangulation
-import numpy as np
-from scipy.spatial import Delaunay
+
 H,T = spider_obj.get_nodes(link,minsep=50)
 points = np.array([[homes.cord[h][0],homes.cord[h][1]] for h in H])
 tri = Delaunay(points)
-fig = plt.figure(figsize=(15,8))
+fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(111)
 nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax,
-                       width=2.5,edge_color='k')
+                        width=2.5,edge_color='k')
 ax.scatter([homes.cord[h][0] for h in H],[homes.cord[h][1] for h in H],c='r',
-           s=25.0,marker='^')
+            s=25.0,marker='*')
 ax.scatter([t[0] for t in list(T.values())],[t[1] for t in list(T.values())],
-            c='b',s=35.0,marker='s')
-ax.triplot(points[:,0], points[:,1], tri.simplices.copy())
+            c='b',s=50.0,marker='*')
+# ax.triplot(points[:,0], points[:,1], tri.simplices.copy())
 ax.set_xlabel("Longitude",fontsize=15)
 ax.set_ylabel("Latitude",fontsize=15)
-ax.set_title("Residences mapped to a link and probable locations of transformers along the link",fontsize=15)
-#sys.exit(0)
+ax.set_title("Points to be covered by secondary distribution network",fontsize=15)
+leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
+            Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
+            Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
+ax.legend(leglines,['road link','probable local transformers',
+                    'individual residential consumers'],
+          loc='best',ncol=2,prop={'size': 13})
+ax.autoscale(tight=True)
+fig.savefig("{}{}.png".format(figPath,'secnet-base'))
+
 #%% Create secondary distribution network as a forest of disconnected trees
-#forest = spider_obj.generate_optimalpf_topology(link,minsep=50)
-#pos_nodes = nx.get_node_attributes(forest,'cords')
-#fig1 = plt.figure(figsize=(15,8))
-#ax1 = fig1.add_subplot(111)
-#nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax1,
-#                       edge_color='k',width=2.5)
-#nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
-#                 ax=ax1,edge_color='r',width=1.0,with_labels=False,
-#                 node_size=25.0)
-#
-#ax1.set_xlabel("Longitude",fontsize=15)
-#ax1.set_ylabel("Latitude",fontsize=15)
-#ax1.set_title("Secondary distribution network generated for the link with power flow constraints",fontsize=15)
-#
-#sys.exit(0)
-#%% Create secondary distribution network as a forest of disconnected trees
-forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,k=2,hops=5)
-pos_nodes = nx.get_node_attributes(forest,'cords')
-fig2 = plt.figure(figsize=(15,8))
+forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
+pos_nodes = nx.get_node_attributes(forest,'cord')
+
+#%% Display the secondary network
+fig2 = plt.figure(figsize=(10,5))
 ax2 = fig2.add_subplot(111)
 nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax2,
-                       edge_color='k',width=2.5)
+                       edge_color='k',width=1.5)
+nodelist = list(forest.nodes())
+colors = ['red' if n not in roots else 'blue' for n in nodelist]
+# shapes = ['*' if n not in roots else 's' for n in nodelist]
 nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
-                 ax=ax2,edge_color='r',width=1.5,with_labels=False,
-                 node_size=25.0)
+                 ax=ax2,edge_color='crimson',width=1,with_labels=False,
+                 node_size=20.0,node_shape='*',node_color=colors)
+
+ax2.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
 ax2.set_xlabel("Longitude",fontsize=15)
 ax2.set_ylabel("Latitude",fontsize=15)
-ax2.set_title("Secondary distribution network generated for the link with heuristics"+\
-              "(maximum degree of 2, maximum leg length of 5)",fontsize=15)
+ax2.set_title("Secondary distribution network generated for the link",fontsize=15)
 
-plt.show()
+
+leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
+            Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='*',markersize=10),
+            Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
+            Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
+ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
+          loc='best',ncol=2,prop={'size': 15})
+ax2.autoscale(tight=True)
+fig2.savefig("{}{}.png".format(figPath,'secnet-result'))
