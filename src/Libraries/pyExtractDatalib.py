@@ -393,27 +393,3 @@ class Query:
 
 
 
-class EIA:
-    """
-    """
-    def __init__(self,path,line_file="Electric_Power_Transmission_Lines.shp",
-                 sub_file="Electric_Substations.shp",state_file="states.shp"):
-        """
-        """
-        data_lines = gpd.read_file(path+line_file)
-        data_substations = gpd.read_file(path+sub_file)
-        data_states = gpd.read_file(path+state_file)
-        
-        state_polygon = list(data_states[data_states.STATE_ABBR == 
-                                 'VA'].geometry.items())[0][1]
-        self.subs = data_substations.loc[data_substations.geometry.within(state_polygon)]
-        self.lines = data_lines.loc[data_lines.geometry.intersects(state_polygon)]
-        
-        sub_list = self.subs['NAME'].values.tolist()
-        idx1 = [i for i,x in enumerate(self.lines['SUB_1'].values) if x not in sub_list]
-        idx2 = [i for i,x in enumerate(self.lines['SUB_2'].values) if x not in sub_list]
-        line_idx = list(set(idx1).union(set(idx2)))
-        self.lines.drop(self.lines.index[line_idx], inplace=True)
-
-
-

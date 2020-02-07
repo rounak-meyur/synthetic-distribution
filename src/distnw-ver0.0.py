@@ -27,14 +27,15 @@ from pyBuildNetworklib import InvertMap as imap
 #%% Initialization of data sets and mappings
 q_object = Query(csvPath)
 gdf_home,homes = q_object.GetHomes()
-roads = q_object.GetRoads(level=[3,4,5])
-MapLink(roads).map_point(homes,path=csvPath,name='home')
+roads = q_object.GetRoads(level=[1,2,3,4,5])
+subs = q_object.GetSubstations()
+# MapLink(roads).map_point(homes,path=csvPath,name='home')
 
 print("DONE")
 
 #%% Check the output
-df_hmap = pd.read_csv(csvPath+'home2link.csv')
-H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
+# df_hmap = pd.read_csv(csvPath+'home2link.csv')
+# H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
 
-L2Home = imap(H2Link)
-links = [l for l in L2Home if 0<len(L2Home[l])<=70]
+# L2Home = imap(H2Link)
+# links = [l for l in L2Home if 0<len(L2Home[l])<=70]
