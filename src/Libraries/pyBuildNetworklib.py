@@ -398,11 +398,11 @@ class Spider:
         nx.set_edge_attributes(graph,edge_cost,'cost')
         return graph,transformers
     
-    def generate_optimal_topology(self,link,minsep=50,penalty=0.5):
+    def generate_optimal_topology(self,link,minsep=50,penalty=0.5,M=25):
         """
         """
         graph,roots = self.create_dummy_graph(link,minsep,penalty)
-        edgelist = MILP_secondary(graph,roots).optimal_edges
+        edgelist = MILP_secondary(graph,roots,M=M).optimal_edges
         forest = nx.Graph()
         forest.add_edges_from(edgelist)
         node_cord = {node: roots[node] if node in roots\
@@ -765,6 +765,52 @@ class Display:
         ax.set_xlabel('Longitude',fontsize=20)
         ax.set_ylabel('Latitude',fontsize=20)
         ax.set_title('Operating voltage at the nodes in the distribution network',
+                     fontsize=20)
+        
+        fig.savefig("{}{}.png".format(path,filename))
+        return colors
+    
+    def check_flows(self,path,filename):
+        """
+        Checks power flow solution and plots the flows at different edges in the 
+        network through colorbars.
+        """
+        nodepos = nx.get_node_attributes(self.dist_net,'cord')
+        A = nx.incidence_matrix(self.dist_net,nodelist=list(self.dist_net.nodes()),
+                                edgelist=list(self.dist_net.edges()),oriented=True).toarray()
+        
+        nodelabel = nx.get_node_attributes(self.dist_net,'label')
+        nodeload = nx.get_node_attributes(self.dist_net,'load')
+        node_ind = [i for i,node in enumerate(self.dist_net.nodes()) \
+                    if nodelabel[node] != 'S']
+        nodelist = [node for node in list(self.dist_net.nodes()) if nodelabel[node] != 'S']
+        edgelist = [edge for edge in list(self.dist_net.edges())]
+        
+        # Resistance data
+        p = np.array([nodeload[h] for h in nodelist])
+        f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
+        
+        flows = {e:f[i] for i,e in enumerate(edgelist)}
+        # edgelabel = nx.get_edge_attributes(self.dist_net,'label')
+        colors = [abs(flows[e]) for e in edgelist]
+        fmin = 0
+        fmax = 0.3
+        
+        # Generate visual representation
+        fig = plt.figure(figsize=(18,15))
+        ax = fig.add_subplot(111)
+        nx.draw_networkx(self.dist_net, nodepos, ax=ax, edge_color=colors,node_color='black',
+            node_size=0.1, edge_cmap=plt.cm.plasma, with_labels=False, 
+            vmin=fmin, vmax=fmax,width=2)
+        cobj = cm.ScalarMappable(cmap='plasma')
+        cobj.set_clim(vmin=fmin,vmax=fmax)
+        cbar = fig.colorbar(cobj,ax=ax)
+        cbar.set_label('Loading level',size=20)
+        cbar.ax.tick_params(labelsize=20)
+        ax.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
+        ax.set_xlabel('Longitude',fontsize=20)
+        ax.set_ylabel('Latitude',fontsize=20)
+        ax.set_title('Loading level of edges in the distribution network',
                      fontsize=20)
         
         fig.savefig("{}{}.png".format(path,filename))

@@ -41,7 +41,7 @@ def mycallback(model, where):
 class MILP_secondary:
     """
     """
-    def __init__(self,graph,roots):
+    def __init__(self,graph,roots,M=25):
         """
         """
         self.edges = list(graph.edges())
@@ -59,13 +59,13 @@ class MILP_secondary:
         self.c = np.array([1e-3*COST[e] for e in self.edges])
         self.l = np.array([1e-3*LENGTH[e] for e in self.edges])
         self.p = np.array([1e-3*LOAD[self.nodes[i]] for i in self.hindex])
-        
+        print(self.p)
         self.model = grb.Model(name="Get Spiders")
         self.model.ModelSense = grb.GRB.MINIMIZE
         self.__variables()
         self.__radiality()
         self.__heuristic()
-        self.__powerflow()
+        self.__powerflow(M=M)
         self.__objective()
         self.model.write("secondary.lp")
         self.optimal_edges = self.__solve()

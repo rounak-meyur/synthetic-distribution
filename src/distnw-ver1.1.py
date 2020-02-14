@@ -63,13 +63,14 @@ L2Home = spider_obj.link_to_home
 
 
 #%% Check for a random link
-links = [l for l in L2Home if 40<len(L2Home[l])<=50]
+# links = [l for l in L2Home if 15<len(L2Home[l])<=20]
 # sys.exit(0)
-link = random.choice(links)
-#link = (171514360, 979565325)
+# link = random.choice(links)
+link = (171535026, 171535137)
+# link = (171514360, 979565325)
 # link = (171524810, 918459968)
 
-#%% Plot the Delaunay Triangulation
+#%% Plot the base network / Delaunay Triangulation
 
 H,T = spider_obj.get_nodes(link,minsep=50)
 points = np.array([[homes.cord[h][0],homes.cord[h][1]] for h in H])
@@ -85,7 +86,7 @@ ax.scatter([t[0] for t in list(T.values())],[t[1] for t in list(T.values())],
 # ax.triplot(points[:,0], points[:,1], tri.simplices.copy())
 ax.set_xlabel("Longitude",fontsize=15)
 ax.set_ylabel("Latitude",fontsize=15)
-ax.set_title("Points to be covered by secondary distribution network",fontsize=15)
+ax.set_title("Residences to be connected by network",fontsize=20)
 leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
             Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
             Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
@@ -93,35 +94,36 @@ ax.legend(leglines,['road link','probable local transformers',
                     'individual residential consumers'],
           loc='best',ncol=2,prop={'size': 13})
 ax.autoscale(tight=True)
-fig.savefig("{}{}.png".format(figPath,'secnet-base'))
+fig.savefig("{}{}.png".format(figPath,'secnet'))
 
 #%% Create secondary distribution network as a forest of disconnected trees
-forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
-pos_nodes = nx.get_node_attributes(forest,'cord')
-
-#%% Display the secondary network
-fig2 = plt.figure(figsize=(10,5))
-ax2 = fig2.add_subplot(111)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax2,
-                       edge_color='k',width=1.5)
-nodelist = list(forest.nodes())
-colors = ['red' if n not in roots else 'blue' for n in nodelist]
-# shapes = ['*' if n not in roots else 's' for n in nodelist]
-nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
-                 ax=ax2,edge_color='crimson',width=1,with_labels=False,
-                 node_size=20.0,node_shape='*',node_color=colors)
-
-ax2.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-ax2.set_xlabel("Longitude",fontsize=15)
-ax2.set_ylabel("Latitude",fontsize=15)
-ax2.set_title("Secondary distribution network generated for the link",fontsize=15)
-
-
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
-ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
-          loc='best',ncol=2,prop={'size': 15})
-ax2.autoscale(tight=True)
-fig2.savefig("{}{}.png".format(figPath,'secnet-result'))
+for c in [0.004,0.005,0.007,0.01]:
+    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,M=c)
+    pos_nodes = nx.get_node_attributes(forest,'cord')
+    
+    # Display the secondary network
+    fig2 = plt.figure(figsize=(10,5))
+    ax2 = fig2.add_subplot(111)
+    nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax2,
+                           edge_color='k',width=1.5)
+    nodelist = list(forest.nodes())
+    colors = ['red' if n not in roots else 'blue' for n in nodelist]
+    # shapes = ['*' if n not in roots else 's' for n in nodelist]
+    nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
+                     ax=ax2,edge_color='crimson',width=1,with_labels=False,
+                     node_size=20.0,node_shape='*',node_color=colors)
+    
+    ax2.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
+    ax2.set_xlabel("Longitude",fontsize=15)
+    ax2.set_ylabel("Latitude",fontsize=15)
+    ax2.set_title("maximum allowable flow through line ="+str(c*1000)+"kVA",fontsize=20)
+    
+    
+    leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
+                Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='*',markersize=10),
+                Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
+                Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
+    ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
+              loc='best',ncol=2,prop={'size': 15})
+    ax2.autoscale(tight=True)
+    fig2.savefig("{}{}.png".format(figPath,'secnet-'+str(int(c*1000))))

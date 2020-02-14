@@ -62,7 +62,7 @@ for i,s in enumerate(list(S2Node.keys())):
     xpts = [nodepos[r][0] for r in S2Node[s]]
     ypts = [nodepos[r][1] for r in S2Node[s]]
     ax.scatter(xpts,ypts,s=1.0,c=color_code[i])
-ax.legend(loc='best',ncol=5)
+ax.legend(loc='best',ncol=5,prop={'size': 20})
 ax.set_xlabel('Longitude',fontsize=20.0)
 ax.set_ylabel('Latitude',fontsize=20.0)
 ax.set_title('Voronoi partitioning of nodes based on shortest-path distance metric',
