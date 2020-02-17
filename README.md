@@ -116,3 +116,65 @@ class MapLink:
         df_map.to_csv(path+name+'2link.csv')
         return
 ```
+So now we go through each aspect of the algorithm used for the mapping. First we consider a single residential coordinate and a subset of road links. Our goal is to evaluate the nearest link to this point. For this purpose, we first load the required coordinates data from the csv file in the specified directory.
+```python
+# Import necessary modules
+import sys,os
+import matplotlib.pyplot as plt
+import networkx as nx
+from collections import namedtuple as nt
+
+# Specify required directories
+workPath = os.getcwd()
+libPath = workPath + "/Libraries/"
+
+# Import user defined libraries
+sys.path.append(libPath)
+from pyExtractDatalib import Query
+from pyMapElementslib import MapLink
+
+# Load the data from the directory
+q_object = Query(csvPath)
+gdf_home,homes = q_object.GetHomes()
+roads = q_object.GetRoads(level=[1,2,3,4,5])
+
+# Take a sample home coordinate and some road nodes
+h = 511210211001462
+nlist = [889535586, 889535587, 335455019, 171517423, 171517458, 
+	171517427, 171517461, 24866230, 922394295, 24866232,171517462]
+
+# Define a named tuple interest to store a road network subgraph of interest
+interest_graph = nx.subgraph(roads.graph,nlist).copy()
+interest_cords = {n:roads.cord[n] for n in nlist}
+interest_obj = nt("network",field_names=["graph","cord"])
+interest = interest_obj(graph=interest_graph,cord=interest_cords)
+xmin = min([c[0] for c in list(interest_cords.values())])-0.001
+xmax = max([c[0] for c in list(interest_cords.values())])+0.001
+ymin = min([c[1] for c in list(interest_cords.values())])-0.001
+ymax = max([c[1] for c in list(interest_cords.values())])+0.001
+
+# Display the residential node along with the links
+fig = plt.figure(figsize=(10,6))
+ax = fig.add_subplot(111)
+nx.draw_networkx(interest.graph,pos=interest.cord,
+                 with_labels=False,node_size=5,edge_color='black')
+ax.scatter(homes.cord[h][0],homes.cord[h][1],marker='D',s=50,c='magenta')
+ax.grid(b=True)
+ax.set_xlim(xmin,xmax)
+ax.set_ylim(ymin,ymax)
+ax.tick_params(axis='both',left=True,bottom=True,labelleft=True,labelbottom=True)
+```
+Now we define an object of the MapLink class and denote the bounding boxes encircling the links in the network.
+```python
+# Define an object for the class MapLink with radius of 5e-6
+from shapely.geometry import box,Point
+M = MapLink(interest,radius=0.000005)
+lines = M.lines
+
+# Display the bounding boxes around each road network link
+for lobj in lines:
+    x1,y1,x2,y2 = lobj[1]
+    b = box(x1,y1,x2,y2)
+    x,y = list(b.exterior.xy)
+    ax.plot(x,y,color='blue',alpha=0.5,linewidth=2)
+```

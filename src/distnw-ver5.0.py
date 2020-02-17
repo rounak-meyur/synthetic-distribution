@@ -3,13 +3,8 @@
 Created on Mon Aug 19 19:57:15 2019
 
 Author: Rounak Meyur
-Description: This program approaches the set cover problem to find optimal/sub-
-optimal placement of transformers along the road network graph. Thereafter it 
-creates a spider network to cover all the residential buildings. The spider net
-is a forest of trees rooted at the transformer nodes.
-This program creates the spider network using heuristic based as well as power
-flow based optimization setup and compares them to better understand the 
-differences.
+Description: This program tries to generate ensemble of synthetic networks by varying
+parameters in the optimization problem.
 """
 
 import sys,os
@@ -97,32 +92,33 @@ ax.autoscale(tight=True)
 fig.savefig("{}{}.png".format(figPath,'secnet'))
 
 #%% Create secondary distribution network as a forest of disconnected trees
-forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
-pos_nodes = nx.get_node_attributes(forest,'cord')
-
-# Display the secondary network
-fig2 = plt.figure(figsize=(10,5))
-ax2 = fig2.add_subplot(111)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax2,
-                       edge_color='k',width=1.5)
-nodelist = list(forest.nodes())
-colors = ['red' if n not in roots else 'blue' for n in nodelist]
-# shapes = ['*' if n not in roots else 's' for n in nodelist]
-nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
-                 ax=ax2,edge_color='crimson',width=1,with_labels=False,
-                 node_size=20.0,node_shape='*',node_color=colors)
-
-ax2.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-ax2.set_xlabel("Longitude",fontsize=15)
-ax2.set_ylabel("Latitude",fontsize=15)
-ax2.set_title("Secondary network creation for road link",fontsize=20)
-
-
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
-ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
-          loc='best',ncol=2,prop={'size': 15})
-ax2.autoscale(tight=True)
-fig2.savefig("{}{}.png".format(figPath,'secnet-output'))
+for i,c in enumerate([0.1,1,10,100]):
+    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,penalty=c)
+    pos_nodes = nx.get_node_attributes(forest,'cord')
+    
+    # Display the secondary network
+    fig2 = plt.figure(figsize=(10,5))
+    ax2 = fig2.add_subplot(111)
+    nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax2,
+                           edge_color='k',width=1.5)
+    nodelist = list(forest.nodes())
+    colors = ['red' if n not in roots else 'blue' for n in nodelist]
+    # shapes = ['*' if n not in roots else 's' for n in nodelist]
+    nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
+                     ax=ax2,edge_color='crimson',width=1,with_labels=False,
+                     node_size=20.0,node_shape='*',node_color=colors)
+    
+    ax2.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
+    ax2.set_xlabel("Longitude",fontsize=15)
+    ax2.set_ylabel("Latitude",fontsize=15)
+    ax2.set_title("penalty factor ="+str(c),fontsize=20)
+    
+    
+    leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
+                Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='*',markersize=10),
+                Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
+                Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
+    ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
+              loc='best',ncol=2,prop={'size': 15})
+    ax2.autoscale(tight=True)
+    fig2.savefig("{}{}.png".format(figPath,'secnet-'+str(i+1)))
