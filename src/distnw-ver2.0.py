@@ -58,7 +58,8 @@ nodepos = nx.get_node_attributes(G,'cord')
 fig = plt.figure(figsize=(15,15))
 ax = fig.add_subplot(111)
 for i,s in enumerate(list(S2Node.keys())):
-    ax.scatter(subs.cord[s][0],subs.cord[s][1],s=30.0,c=color_code[i],label=str(i+1))
+    ax.scatter(subs.cord[s][0],subs.cord[s][1],s=100.0,c=color_code[i],label=str(i+1),
+               marker='D')
     xpts = [nodepos[r][0] for r in S2Node[s]]
     ypts = [nodepos[r][1] for r in S2Node[s]]
     ax.scatter(xpts,ypts,s=1.0,c=color_code[i])
@@ -67,3 +68,21 @@ ax.set_xlabel('Longitude',fontsize=20.0)
 ax.set_ylabel('Latitude',fontsize=20.0)
 ax.set_title('Voronoi partitioning of nodes based on shortest-path distance metric',
              fontsize=20.0)
+
+
+#%% Inset figure
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
+axins = zoomed_inset_axes(ax, 4.0, loc=4)
+i = 21
+s = list(S2Node.keys())[i]
+axins.scatter(subs.cord[s][0],subs.cord[s][1],s=100.0,c=color_code[i],label=str(i+1),
+              marker='D')
+xpts = [nodepos[r][0] for r in S2Node[s]]
+ypts = [nodepos[r][1] for r in S2Node[s]]
+axins.scatter(xpts,ypts,s=1.0,c=color_code[i])
+
+axins.set_xlim(min(xpts),max(xpts))
+axins.set_ylim(min(ypts),max(ypts))
+axins.tick_params(bottom=False,left=False,labelleft=False,labelbottom=False)
+
+mark_inset(ax, axins, loc1=2, loc2=4, fc="none", ec="0.5")

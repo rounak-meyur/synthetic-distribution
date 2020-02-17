@@ -41,7 +41,7 @@ def mycallback(model, where):
 class MILP_secondary:
     """
     """
-    def __init__(self,graph,roots,M=25):
+    def __init__(self,graph,roots):
         """
         """
         self.edges = list(graph.edges())
@@ -65,7 +65,7 @@ class MILP_secondary:
         self.__variables()
         self.__radiality()
         self.__heuristic()
-        self.__powerflow(M=M)
+        self.__powerflow()
         self.__objective()
         self.model.write("secondary.lp")
         self.optimal_edges = self.__solve()

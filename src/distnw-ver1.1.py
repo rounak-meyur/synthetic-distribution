@@ -63,12 +63,12 @@ L2Home = spider_obj.link_to_home
 
 
 #%% Check for a random link
-# links = [l for l in L2Home if 15<len(L2Home[l])<=20]
+links = [l for l in L2Home if 20<len(L2Home[l])<=25]
 # sys.exit(0)
 # link = random.choice(links)
-link = (171535026, 171535137)
+# link = (171535026, 171535137)
 # link = (171514360, 979565325)
-# link = (171524810, 918459968)
+link = (171528302, 171526182)
 
 #%% Plot the base network / Delaunay Triangulation
 
@@ -97,8 +97,8 @@ ax.autoscale(tight=True)
 fig.savefig("{}{}.png".format(figPath,'secnet'))
 
 #%% Create secondary distribution network as a forest of disconnected trees
-for c in [0.004,0.005,0.007,0.01]:
-    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,M=c)
+for i,c in enumerate([0.1,1,10,100]):
+    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,penalty=c)
     pos_nodes = nx.get_node_attributes(forest,'cord')
     
     # Display the secondary network
@@ -116,7 +116,7 @@ for c in [0.004,0.005,0.007,0.01]:
     ax2.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
     ax2.set_xlabel("Longitude",fontsize=15)
     ax2.set_ylabel("Latitude",fontsize=15)
-    ax2.set_title("maximum allowable flow through line ="+str(c*1000)+"kVA",fontsize=20)
+    ax2.set_title("penalty factor ="+str(c),fontsize=20)
     
     
     leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
@@ -126,4 +126,4 @@ for c in [0.004,0.005,0.007,0.01]:
     ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
               loc='best',ncol=2,prop={'size': 15})
     ax2.autoscale(tight=True)
-    fig2.savefig("{}{}.png".format(figPath,'secnet-'+str(int(c*1000))))
+    fig2.savefig("{}{}.png".format(figPath,'secnet-'+str(i+1)))

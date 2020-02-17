@@ -402,7 +402,7 @@ class Spider:
         """
         """
         graph,roots = self.create_dummy_graph(link,minsep,penalty)
-        edgelist = MILP_secondary(graph,roots,M=M).optimal_edges
+        edgelist = MILP_secondary(graph,roots).optimal_edges
         forest = nx.Graph()
         forest.add_edges_from(edgelist)
         node_cord = {node: roots[node] if node in roots\
