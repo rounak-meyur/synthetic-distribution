@@ -21,4 +21,6 @@ This is accomplished using a QD-Tree approach. The primary aim is to reduce the 
 ## Creating the secondary distribution network
 Once the home coordinates are mapped to the nearest road network link, the next objective is to create the secondary distribution network which connects the residence coordinates with points on the road link. The first step is to interpolate points along the road network link where local transformers can be placed. An usual engineering practice undertaken by most distribution companies is to place these local transformers at equal distance apart from each other along the link. 
 
+## Generating ensemble of synthetic networks 
 ![png](output_step2_ensemble1.png)
+![png](output_step2_ensemble2.png)
