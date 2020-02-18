@@ -16,5 +16,9 @@ This is accomplished using a QD-Tree approach. The primary aim is to reduce the 
 3. Find the intersections of bounding box of road links with that of residential point.
 4. Compute the nearest link among these short-listed links.
 
-![png](output_9_1.png)
+![png](output_step1.png)
 
+## Creating the secondary distribution network
+Once the home coordinates are mapped to the nearest road network link, the next objective is to create the secondary distribution network which connects the residence coordinates with points on the road link. The 
+
+![png](output_step2_ensemble1.png)

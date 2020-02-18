@@ -114,11 +114,11 @@ ax2.autoscale(tight=True)
 fig2.savefig("{}{}.png".format(figPath,'secnet-output'))
 
 #%% Compare voltages at different nodes when heuristic choices are varied
-dict_vol = {h:[] for h in homelist}
+dict_vol = {h:[] for h in H}
 for hop in range(4,12):
     forest,tsfr = spider_obj.generate_optimal_topology(link,minsep=50,hops=hop)
     volts = spider_obj.checkpf(forest,tsfr)
-    for h in homelist: dict_vol[h].append(volts[h])
+    for h in H: dict_vol[h].append(volts[h])
 
 # Plot variation in voltages at nodes
 data = np.array(list(dict_vol.values()))
@@ -126,7 +126,7 @@ homeID = [str(h) for h in list(dict_vol.keys())]
 fig = plt.figure(figsize=(10,6))
 ax = fig.add_subplot(111)
 ax.plot(data,'o-')
-ax.set_xticks(range(len(homelist)))
+ax.set_xticks(range(len(H)))
 ax.set_xticklabels(homeID)
 ax.tick_params(axis='x',rotation=90)
 ax.set_xlabel("Residential Building IDs",fontsize=15)
