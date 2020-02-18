@@ -28,7 +28,8 @@ Once the home coordinates are mapped to the nearest road network link, the next 
 6. There should not be any loops in the network. This is ensured by 
 	- the flow constraint since all residences have positive loads and 
 	- considering total number of edges to be equal to the number of residences which are also non-root nodes.
-The above 
+
+The above constraints are formulated as linear constraints in a mixed integer linear programming (MILP) problem. The objective function of the problem is the total length of all edges in the network. The 
 
 ## Generating ensemble of synthetic networks 
 ![png](output_step2_ensemble1.png)
