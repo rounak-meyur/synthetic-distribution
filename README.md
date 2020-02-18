@@ -19,7 +19,16 @@ This is accomplished using a QD-Tree approach. The primary aim is to reduce the 
 ![png](output_step1.png)
 
 ## Creating the secondary distribution network
-Once the home coordinates are mapped to the nearest road network link, the next objective is to create the secondary distribution network which connects the residence coordinates with points on the road link. The first step is to interpolate points along the road network link where local transformers can be placed. An usual engineering practice undertaken by most distribution companies is to place these local transformers at equal distance apart from each other along the link. 
+Once the home coordinates are mapped to the nearest road network link, the next objective is to create the secondary distribution network which connects the residence coordinates with points on the road link. The first step is to interpolate points along the road network link where local transformers can be placed. An usual engineering practice undertaken by most distribution companies is to place these local transformers at equal distance apart from each other along the link. Let this distance be denoted by $\mathsf{d}$. The following aspects act as constraints while creating the secondary distribution network.
+1. Each residential node has to be covered.
+2. The transformer nodes can only be root nodes for the network.
+3. Each residential node can either have a degree of 1 (leaf node) or 2 (non-leaf node).
+4. The maximum number of hops from a transformer node (root node) is $h$.
+5. The power balance constraint at every node should be maintained (commodity flow model).
+6. There should not be any loops in the network. This is ensured by 
+	- the flow constraint since all residences have positive loads and 
+	- considering total number of edges to be equal to the number of residences which are also non-root nodes.
+The above 
 
 ## Generating ensemble of synthetic networks 
 ![png](output_step2_ensemble1.png)
