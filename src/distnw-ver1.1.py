@@ -7,20 +7,18 @@ Description: This program approaches the set cover problem to find optimal/sub-
 optimal placement of transformers along the road network graph. Thereafter it 
 creates a spider network to cover all the residential buildings. The spider net
 is a forest of trees rooted at the transformer nodes.
-This program creates the spider network using heuristic based as well as power
-flow based optimization setup and compares them to better understand the 
-differences.
+
+The output of the program are the following:
+    1. secondary network which is a forest of trees. The graph is output in a 
+    .txt file in the temp directory
+    2. list of transformers with the load and spatial coordinates in csv dir
+    3. list of edges in the primary network formed by road nodes and transformers
 """
 
 import sys,os
 import pandas as pd
-import matplotlib.pyplot as plt
 import networkx as nx
-
-import random
-import numpy as np
-from scipy.spatial import Delaunay
-from matplotlib.lines import Line2D
+import datetime
 
 
 workPath = os.getcwd()
@@ -28,101 +26,88 @@ inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
 figPath = workPath + "/figs/"
+tmpPath = workPath + "/temp/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
 from pyBuildNetworklib import Spider
-
-# from pyMapElementslib import MapLink
-# MapLink(roads).map_point(homes,path=csvPath,name='home')
-# sys.exit(0)
-#%%
-def get_neighbors(graph,u,v,hops=2):
-    """
-    """
-    nlist = [u,v]
-    for i in range(hops):
-        temp = []
-        for n in nlist:
-            temp.extend(list(graph.neighbors(n)))
-        nlist = list(set(temp))
-    return nlist
-
+from pyBuildNetworklib import MeasureDistance as dist
+#from pyMapElementslib import MapLink
+#MapLink(roads).map_points(homes,path=csvPath,name='home')
 
 #%% Initialization of data sets and mappings
 q_object = Query(csvPath)
 gdf_home,homes = q_object.GetHomes()
-roads = q_object.GetRoads(level=[1,2,3,4,5])
-
+roads = q_object.GetRoads()
 
 df_hmap = pd.read_csv(csvPath+'home2link.csv')
 H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
 spider_obj = Spider(homes,roads,H2Link)
 L2Home = spider_obj.link_to_home
-
-
-
-#%% Check for a random link
-links = [l for l in L2Home if 20<len(L2Home[l])<=25]
+links = [l for l in L2Home if 0<len(L2Home[l])<=70]
 # sys.exit(0)
-# link = random.choice(links)
-# link = (171535026, 171535137)
-# link = (171514360, 979565325)
-link = (171528302, 171526182)
+#%% Create secondary network
+import time
+start_time = time.time()
+prefix = '51121'
+suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
+network = ''
+count = 100000
+dict_tsfr = {}
+edgelist = []
+for link in links:
+    # initialize
+    rename = {} # to rename the transformers with node IDs
+    tsfrlist = [] # to list the transformers
+    
+    # Solve the optimization problem and generate forest
+    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
+    cord = nx.get_node_attributes(forest,'cord')
+    load = nx.get_node_attributes(forest,'load')
+    
+    # Iterate over nodes to record transformers
+    for n in sorted(list(forest.nodes())):
+        if n in roots:
+            dict_tsfr[int(prefix+str(count))] = [cord[n][0],cord[n][1],load[n]]
+            rename[n] = int(prefix+str(count))
+            tsfrlist.append(int(prefix+str(count)))
+            count += 1
+    
+    # Get edgelist for primary network design
+    start_tsf = dict_tsfr[tsfrlist[0]][:2]
+    if dist(start_tsf,roads.cord[link[0]])<dist(start_tsf,roads.cord[link[1]]):
+        start = link[0]; end = link[1]
+    else:
+        start = link[1]; end = link[0]
+    nodes = [start]+tsfrlist+[end]
+    g = nx.Graph()
+    nx.add_path(g,nodes)
+    edgelist += list(g.edges())
+    
+    # Iterate over edges to record secondary network
+    for e in list(forest.edges()):
+        node1 = str(rename[e[0]]) if e[0] in roots else str(e[0])
+        type1 = 'T' if e[0] in roots else 'H'
+        cord1a = str(cord[e[0]][0])
+        cord1b = str(cord[e[0]][1])
+        node2 = str(rename[e[1]]) if e[1] in roots else str(e[1])
+        type2 = 'T' if e[1] in roots else 'H'
+        cord2a = str(cord[e[1]][0])
+        cord2b = str(cord[e[1]][1])
+        network += ' '.join([node1,type1,cord1a,cord1b,
+                             node2,type2,cord2a,cord2b])+'\n'
+    
+end_time = time.time()
 
-#%% Plot the base network / Delaunay Triangulation
+#%% Save required data
+f_network = open(tmpPath+"sec-dist"+suffix+".txt",'w')
+f_network.write(network)
+f_network.close()
+df = pd.DataFrame(edgelist,columns=['source','target'])
+df.to_csv(csvPath+'tsfr-net.csv',index=False)
 
-H,T = spider_obj.get_nodes(link,minsep=50)
-points = np.array([[homes.cord[h][0],homes.cord[h][1]] for h in H])
-tri = Delaunay(points)
-fig = plt.figure(figsize=(10,5))
-ax = fig.add_subplot(111)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax,
-                        width=2.5,edge_color='k')
-ax.scatter([homes.cord[h][0] for h in H],[homes.cord[h][1] for h in H],c='r',
-            s=25.0,marker='*')
-ax.scatter([t[0] for t in list(T.values())],[t[1] for t in list(T.values())],
-            c='b',s=50.0,marker='*')
-# ax.triplot(points[:,0], points[:,1], tri.simplices.copy())
-ax.set_xlabel("Longitude",fontsize=15)
-ax.set_ylabel("Latitude",fontsize=15)
-ax.set_title("Residences to be connected by network",fontsize=20)
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
-ax.legend(leglines,['road link','probable local transformers',
-                    'individual residential consumers'],
-          loc='best',ncol=2,prop={'size': 13})
-ax.autoscale(tight=True)
-fig.savefig("{}{}.png".format(figPath,'secnet'))
+df = pd.DataFrame.from_dict(dict_tsfr,orient='index',
+                            columns=['long','lat','load'])
+df.to_csv(csvPath+'tsfr-cord-load.csv')
 
-#%% Create secondary distribution network as a forest of disconnected trees
-forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
-pos_nodes = nx.get_node_attributes(forest,'cord')
-
-# Display the secondary network
-fig2 = plt.figure(figsize=(10,5))
-ax2 = fig2.add_subplot(111)
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,edgelist=[link],ax=ax2,
-                       edge_color='k',width=1.5)
-nodelist = list(forest.nodes())
-colors = ['red' if n not in roots else 'blue' for n in nodelist]
-# shapes = ['*' if n not in roots else 's' for n in nodelist]
-nx.draw_networkx(forest,pos=pos_nodes,edgelist=list(forest.edges()),
-                 ax=ax2,edge_color='crimson',width=1,with_labels=False,
-                 node_size=20.0,node_shape='*',node_color=colors)
-
-ax2.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-ax2.set_xlabel("Longitude",fontsize=15)
-ax2.set_ylabel("Latitude",fontsize=15)
-ax2.set_title("Secondary network creation for road link",fontsize=20)
-
-
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='blue', marker='*',markersize=10),
-            Line2D([0], [0], color='white', markerfacecolor='red', marker='*',markersize=10)]
-ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
-          loc='best',ncol=2,prop={'size': 15})
-ax2.autoscale(tight=True)
-fig2.savefig("{}{}.png".format(figPath,'secnet-output'))
+print("DONE")

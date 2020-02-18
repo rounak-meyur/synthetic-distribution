@@ -303,9 +303,18 @@ class Link(LineString):
 
 class Spider:
     """
+    Contains methods and attributes to generate the secondary distribution network
+    originating from a link. The link consists of multiple transformers and uses 
+    multiple engineering and economic heuristics to generate the network.
     """
     def __init__(self,homes,roads,home_to_link):
         """
+        Initializes the class object with all home nodes, road network and the mapping
+        between them.
+        
+        Input:  homes: named tuple with all residential building data
+                roads: named tuple with all road network information
+                home_to_link: mapping between homes and road links
         """
         self.home_load = homes.average
         self.home_cord = homes.cord
@@ -316,7 +325,13 @@ class Spider:
     
     def __separate_side(self,link):
         """
-        Evaluates the groups of homes on either side of the link
+        Evaluates the groups of homes on either side of the link. This would help in 
+        creating network with minimum crossover of distribution lines over the road
+        network.
+        
+        Input: link: the road link of interest
+        Output: side: dictionary of homes as keys and value as 1 or -1 depending on
+                which side of the link it is present.
         """
         homelist = self.link_to_home[link] if link in self.link_to_home\
             else self.link_to_home[(link[1],link[0])]
@@ -324,15 +339,19 @@ class Spider:
         (x1,y1) = self.road_cord[link[0]]
         (x2,y2) = self.road_cord[link[1]]
         eqn = [((x-x1)*(y2-y1))-((y-y1)*(x2-x1)) for (x,y) in points]
-        side = {}
-        for index,home in enumerate(homelist):
-            if eqn[index]>=0: side[home]=1
-            else: side[home]=-1
+        side = {home: 1 if eqn[index]>=0 else -1 for index,home in enumerate(homelist)}
         return side
     
     
     def __complete_graph_from_list(self,L):
         """
+        Computes the full graph of the nodes in list L. There would be L(L-1)/2 edges 
+        in the network. This is used as base network when the number of nodes mapped 
+        to the link is small.
+        
+        Input: L: list of nodes mapped to the link of interest
+        Output: graph: the full graph which would be used as base network for the 
+                optimization problem.
         """
         G = nx.Graph()
         edges = combinations(L,2)
@@ -341,6 +360,13 @@ class Spider:
     
     def __delaunay_graph_from_list(self,L):
         """
+        Computes the Delaunay graph of the nodes in list L. L edges in the network 
+        based on the definition of Delaunay triangulation. This is used as base 
+        network when the number of nodes mapped to the link is small.
+        
+        Input: L: list of nodes mapped to the link of interest
+        Output: graph: the Delaunay graph which would be used as base network for the 
+                optimization problem.
         """
         points = np.array([[self.home_cord[h][0],
                             self.home_cord[h][1]] for h in L])
@@ -355,6 +381,14 @@ class Spider:
     
     def get_nodes(self,link,minsep):
         """
+        Gets all the nodes from the dummy graph created before solving the optimization 
+        problem.
+        
+        Inputs: link: road link of interest for which the problem is solved.
+                minsep: minimum separation in meters between the transformers.
+        Outputs:home_pts: list of residential points
+                transformers: list of points along link which are probable locations 
+                of transformers.
         """
         home_pts = self.link_to_home[link]
         if len(home_pts) > 100:
@@ -368,6 +402,15 @@ class Spider:
     
     def create_dummy_graph(self,link,minsep,penalty):
         """
+        Creates the base network to carry out the optimization problem. The base graph
+        may be a Delaunay graph or a full graph depending on the size of the problem.
+        
+        Inputs: link: road link of interest for which the problem is solved.
+                minsep: minimum separation in meters between the transformers.
+                penalty: penalty factor for crossing the link.
+        Outputs:graph: the generated base graph also called the dummy graph
+                transformers: list of points along link which are probable locations 
+                of transformers.
         """
         sides = self.__separate_side(link)
         home_pts = self.link_to_home[link]
@@ -381,6 +424,7 @@ class Spider:
         sides.update({t:0 for t in transformers})
         load.update({t:1.0 for t in transformers})
         
+        # Create the base graph
         if len(home_pts)>10:
             graph = self.__delaunay_graph_from_list(home_pts)
         else:
@@ -398,11 +442,19 @@ class Spider:
         nx.set_edge_attributes(graph,edge_cost,'cost')
         return graph,transformers
     
-    def generate_optimal_topology(self,link,minsep=50,penalty=0.5,M=25):
+    def generate_optimal_topology(self,link,minsep=50,penalty=0.5,hops=4):
         """
+        Calls the MILP problem and solves it using gurobi solver.
+        
+        Inputs: link: road link of interest for which the problem is solved.
+                minsep: minimum separation in meters between the transformers.
+                penalty: penalty factor for crossing the link.
+        Outputs:forest: the generated forest graph which is the secondary network
+                roots: list of points along link which are actual locations of 
+                transformers.
         """
         graph,roots = self.create_dummy_graph(link,minsep,penalty)
-        edgelist = MILP_secondary(graph,roots).optimal_edges
+        edgelist = MILP_secondary(graph,roots,hops).optimal_edges
         forest = nx.Graph()
         forest.add_edges_from(edgelist)
         node_cord = {node: roots[node] if node in roots\
