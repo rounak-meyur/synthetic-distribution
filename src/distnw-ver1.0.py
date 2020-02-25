@@ -80,7 +80,7 @@ ax.legend(leglines,['road link','probable local transformers',
                     'individual residential consumers'],
           loc='best',ncol=2,prop={'size': 13})
 ax.autoscale(tight=True)
-fig.savefig("{}{}.png".format(figPath,'secnet'))
+# fig.savefig("{}{}.png".format(figPath,'secnet'))
 
 #%% Create secondary distribution network as a forest of disconnected trees
 forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
@@ -111,7 +111,7 @@ leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='*',m
 ax2.legend(leglines,['road link','secondary network','local transformers','residences'],
           loc='best',ncol=2,prop={'size': 15})
 ax2.autoscale(tight=True)
-fig2.savefig("{}{}.png".format(figPath,'secnet-output'))
+# fig2.savefig("{}{}.png".format(figPath,'secnet-output'))
 
 #%% Compare voltages at different nodes when heuristic choices are varied
 dict_vol = {h:[] for h in H}

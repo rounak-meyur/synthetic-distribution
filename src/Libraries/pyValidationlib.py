@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from scipy import stats
 
-def create_base(path,thresh=2):
+def create_base(path,filename='hethwood',thresh=2):
     """
     """
-    df_network = pd.read_csv(path+'hethwood.csv')
+    df_network = pd.read_csv(path+filename+'.csv')
         
     # Networkx graph construction
     root = nx.from_pandas_edgelist(df_network,'node_a','node_b')

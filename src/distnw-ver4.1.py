@@ -24,9 +24,12 @@ from pyValidationlib import create_base, degree_dist, hop_dist
 #%% Create the plots
 q_object = Query(csvPath)
 _,homes = q_object.GetHomes()
-G = create_base(csvPath)
+G = create_base(csvPath,filename='hethwood-ver2')
 
 
+# sys.exit(0)
+
+#%% Hop and degree distributions
 for sub in [34780,34810,34816,28228,28235]:
     dist_net = read_network(tmpPath+str(sub)+'-network.txt',homes)
     nodelab = nx.get_node_attributes(dist_net,'label')

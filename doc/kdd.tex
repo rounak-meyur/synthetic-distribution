@@ -566,8 +566,8 @@ The proposed methodology is used to generate synthetic distribution networks con
 
 \section{Conclusion}
 This paper proposes a methodology to generate synthetic distribution networks for a particular geographical location based on available road network data. The generated network connects individual residential customers to substations while maintaining a radial configuration. Additionally, the network is created such that the overall length of overhead lines is minimized which is similar to planning methodologies undertaken by distribution companies. This ensures that generated synthetic distribution network is realistic and can be used to represent the network of the geographic location accurately. Furthermore, the consideration of several engineering and economic aspects in inferring the network has led us to identify certain parameters whose values can be modified to generate ensembles of synthetic networks.
-\bibliographystyle{abbrvnat}
-\bibliography{references}
+%%\bibliographystyle{abbrvnat}
+%%\bibliography{references}
 
 \newpage
 
@@ -610,7 +610,7 @@ A graph $\mathcal{G}(\mathcal{V},\mathcal{E})$ with reduced branch-bus incidence
 \end{table}
 
 Now, we show how varying one such parameter creates ensembles of networks for the same set of residential building points. The penalty factor ($\lambda$) in the objective function (\ref{eq:weight}) is varied for factors of $\lambda=0.1,1,10$. The generated ensemble networks are shown in Fig.~\ref{fig:ensemble}. As we increase the penalty factor, the optimization program tends to find networks with longer edges and lesser number of root nodes (because the objective function penalizes multiple root nodes).
-\begin{figure*}[t]
+\begin{figure}[t]
 	\centering
 	\includegraphics[width=0.235\textwidth]{figs/secnet.png}
 	\includegraphics[width=0.235\textwidth]{figs/secnet-1.png}
@@ -618,7 +618,7 @@ Now, we show how varying one such parameter creates ensembles of networks for th
 	\includegraphics[width=0.235\textwidth]{figs/secnet-3.png}
 	\caption{Ensemble network creation for the same set of residential buildings. The penalty factor in the objective function of optimization problem to create secondary network is varied in this case. The first figure shows the set of residences which are to be connected and probable locations of local transformers. The remaining three figures show generated ensembles of secondary network when the penalty factor is varied for three different values.}
 	\label{fig:ensemble}
-\end{figure*}
+\end{figure}
 
 
 \end{document}
