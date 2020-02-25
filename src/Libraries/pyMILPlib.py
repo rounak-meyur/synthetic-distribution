@@ -25,14 +25,14 @@ def mycallback(model, where):
         elif(time>60 and abs(objbst - objbnd) < 0.0025 * (1.0 + abs(objbst))):
             print('Stop early - 0.25% gap achieved time exceeds 1 minute')
             model.terminate()
-        elif(time>1200 and abs(objbst - objbnd) < 0.01 * (1.0 + abs(objbst))):
-            print('Stop early - 1.00% gap achieved time exceeds 20 minutes')
+        elif(time>300 and abs(objbst - objbnd) < 0.01 * (1.0 + abs(objbst))):
+            print('Stop early - 1.00% gap achieved time exceeds 5 minutes')
             model.terminate()
-        elif(time>1800 and abs(objbst - objbnd) < 0.05 * (1.0 + abs(objbst))):
-            print('Stop early - 5.00% gap achieved time exceeds 30 minutes')
+        elif(time>480 and abs(objbst - objbnd) < 0.05 * (1.0 + abs(objbst))):
+            print('Stop early - 5.00% gap achieved time exceeds 8 minutes')
             model.terminate()
-        elif(time>2400 and abs(objbst - objbnd) < 0.1 * (1.0 + abs(objbst))):
-            print('Stop early - 10.0% gap achieved time exceeds 40 minutes')
+        elif(time>600 and abs(objbst - objbnd) < 0.1 * (1.0 + abs(objbst))):
+            print('Stop early - 10.0% gap achieved time exceeds 10 minutes')
             model.terminate()
     return
 
@@ -177,7 +177,7 @@ class MILP_primary:
     network for covering a given set of local transformers through the edges of
     an existing road network.
     """
-    def __init__(self,graph,tnodes):
+    def __init__(self,graph,tnodes,flow=400,feeder=10):
         """
         graph: the base graph which has the list of possible edges.
         tnodes: dictionary of transformer nodes with power consumption as value.
@@ -202,9 +202,9 @@ class MILP_primary:
         self.__variables()
         self.__powerflow()
         self.__radiality()
-        self.__flowconstraint()
+        self.__flowconstraint(M=flow)
         self.__connectivity()
-        self.__limit_feeder()
+        self.__limit_feeder(M=feeder)
         self.__objective()
         self.model.write("primary.lp")
         self.solve()

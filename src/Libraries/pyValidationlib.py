@@ -31,7 +31,7 @@ def create_base(path,filename='hethwood',thresh=2):
     return graph
 
 
-def degree_dist(graph,base,sub,path):
+def degree_dist(graph,base,sub,path,fname=None):
     """
     Creates the degree distribution of the networks. The synthetic network is compared
     with a base network. The degree distribution of both the networks is plotted 
@@ -82,11 +82,16 @@ def degree_dist(graph,base,sub,path):
     ax.set_ylabel("Percentage of nodes",fontsize=15)
     ax.set_xlabel("Degree of nodes",fontsize=15)
     ax.tick_params(axis='both', labelsize=15)
-    ax.set_title("Degree distribution comparison for synthetic network rooted at "+str(sub),
-                 fontsize=15)
+    if fname == None:
+        ax.set_title("Degree distribution comparison for synthetic network rooted at "+str(sub),
+                     fontsize=15)
+    else:
+        ax.set_title("Degree distribution for "+str(sub)+" with maximum flow:"+fname.split('-')[3],
+                     fontsize=15)
     
     # Save the figure
-    filename = str(sub)+'-degree-dist'
+    if fname == None:filename = str(sub)+'-degree-dist'
+    else: filename = fname
     fig.savefig("{}{}.png".format(path,filename))
     print("Kolmogorov Smimnov test result:",stats.ks_2samp(degree_sequence_a,
                                                            degree_sequence_b))
@@ -100,7 +105,7 @@ def to_percent(y, position):
     return s
 
 
-def hop_dist(graph,base,sub,path):
+def hop_dist(graph,base,sub,path,fname=None):
     """
     Creates the hop distribution of the networks. The synthetic network is compared
     with a base network. The hop distribution of both the networks is plotted 
@@ -129,10 +134,15 @@ def hop_dist(graph,base,sub,path):
     ax.set_xlabel("Hops from root node",fontsize=15)
     ax.legend(prop={'size': 15})
     ax.tick_params(axis='both', labelsize=15)
-    ax.set_title("Hop distribution comparison for synthetic network rooted at "+str(sub),
-                 fontsize=15)
+    if fname == None:
+        ax.set_title("Hop distribution comparison for synthetic network rooted at "+str(sub),
+                     fontsize=15)
+    else:
+        ax.set_title("Hop distribution for "+str(sub)+" with maximum flow:"+fname.split('-')[3],
+                     fontsize=15)
     
     # Save the figure
-    filename = str(sub)+'-hop-dist'
+    if fname==None:filename = str(sub)+'-hop-dist'
+    else: filename=fname
     fig.savefig("{}{}.png".format(path,filename))
     return  

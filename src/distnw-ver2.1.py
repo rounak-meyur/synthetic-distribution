@@ -20,8 +20,8 @@ workPath = os.getcwd()
 inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
-figPath = workPath + "/figs/"
-tmpPath = workPath + "/temp/"
+figPath = workPath + "/figs/prim-ensemble/"
+tmpPath = workPath + "/temp/prim-ensemble/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
@@ -54,27 +54,29 @@ substation = nt("local_substation",field_names=["id","cord","nodes"])
 sub_data = substation(id=sub,cord=subs.cord[sub],nodes=S2Node[sub])
 
 #%% Generate primary distribution network
-P = Primary(sub_data,homes,graph)
-plot_graph(P.graph,subdata=sub_data,path=figPath,filename=str(sub)+'-master')
+# P = Primary(sub_data,homes,graph)
+# plot_graph(P.graph,subdata=sub_data,path=figPath,filename=str(sub)+'-master')
 
-sys.exit(0)
-P.get_sub_network(secondary_network_file)
-dist_net = P.dist_net
+# sys.exit(0)
 
-#%% Save network
-D = Display(dist_net)
-filename = str(sub)+'-network'
-D.plot_network(figPath,filename)
-D.save_network(tmpPath,filename)
+for fmax in range(100,220,20):
+    P = Primary(sub_data,homes,graph)
+    P.get_sub_network(secondary_network_file,flowmax=fmax,feedermax=8)
+    dist_net = P.dist_net
+    D = Display(dist_net)
+    filename = str(sub)+'-network-f-'+str(fmax)+'-s-8'
+    D.plot_network(figPath,filename)
+    D.save_network(tmpPath,filename)
 
-#%% Test for cycles and run power flow
-try:
-    print("Number of cycles:",len(nx.find_cycle(dist_net)))
-except:
-    print("No cycles found!!!")
-    pass
-filename = str(sub)+'-voltage'
-voltage = D.check_pf(figPath,filename)
+    try:
+        print("Number of cycles:",len(nx.find_cycle(dist_net)))
+    except:
+        print("No cycles found!!!")
+        pass
+
+#%% run power flow
+# filename = str(sub)+'-voltage'
+# voltage = D.check_pf(figPath,filename)
 
 
 
