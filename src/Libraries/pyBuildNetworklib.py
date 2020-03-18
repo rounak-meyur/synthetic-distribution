@@ -226,36 +226,36 @@ def plot_graph(graph,subdata=None,path=None,filename=None):
     ax = fig.add_subplot(111)
     
     # Plot individual subgraphs
-    rcol = sns.color_palette('bright',nx.number_connected_components(graph))
+    rcol = ['green']
     for i,nlist in enumerate(list(nx.connected_components(graph))):
         sub_graph = nx.subgraph(graph,list(nlist))
         col = ['black' if nodelabel[n]=='R' else rcol[i] for n in list(nlist)]
-        nx.draw_networkx(sub_graph,pos=nodepos,nodelist = list(nlist),node_size=10.0,
-                         node_color=col,edge_width=1.0, edge_color='black',ax=ax,
+        nx.draw_networkx(sub_graph,pos=nodepos,nodelist = list(nlist),node_size=20.0,
+                         node_color=col,width=2.0, edge_color='black',ax=ax,style='dashed',
                          with_labels=False)
     
     # Scatter plot the substations
     if subdata != None:
         subx = subdata.cord[0]
         suby = subdata.cord[1]
-        ax.scatter(subx,suby,s=80.0,c='green')
+        ax.scatter(subx,suby,s=120.0,c='dodgerblue')
     
     # Titles and labels for plot
-    ax.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-    ax.set_xlabel("Longitude",fontsize=20)
-    ax.set_ylabel("Latitude",fontsize=20)
-    ax.set_title("Possible set of edges in primary network",fontsize=20)
+    ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+    # ax.set_xlabel("Longitude",fontsize=20)
+    # ax.set_ylabel("Latitude",fontsize=20)
+    ax.set_title("Possible set of edges in primary network",fontsize=30)
     
     # Define legends for the plot
-    leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=10),
-                Line2D([0], [0], color='white', markerfacecolor='green', marker='o',markersize=10)]+\
+    leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=0,linestyle='dashed'),
+                Line2D([0], [0], color='white', markerfacecolor='dodgerblue', marker='o',markersize=10)]+\
                 [Line2D([0], [0], color='white', markerfacecolor=c, marker='o',markersize=10) for c in rcol]
     ax.legend(leglines,['road network','substations']+\
               ['transformer nodes' for i in range(len(rcol))],
               loc='best',ncol=1,prop={'size': 20})
     plt.show()
     if path != None:
-        fig.savefig("{}{}.png".format(path,filename))
+        fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
     return
     
 
@@ -454,7 +454,7 @@ class Spider:
                 transformers.
         """
         graph,roots = self.create_dummy_graph(link,minsep,penalty)
-        edgelist = MILP_secondary(graph,roots,hops).optimal_edges
+        edgelist = MILP_secondary(graph,roots).optimal_edges
         forest = nx.Graph()
         forest.add_edges_from(edgelist)
         node_cord = {node: roots[node] if node in roots\
@@ -689,20 +689,21 @@ class Display:
         size = []
         for n in nodelist:
             if node_label[n] == 'T':
-                colors.append('blue')
-                size.append(4.0)
+                colors.append('green')
+                size.append(20.0)
             elif node_label[n] == 'H':
                 colors.append('red')
-                size.append(2.0)
+                size.append(5.0)
             elif node_label[n] == 'R':
                 colors.append('black')
-                size.append(1.0)
+                size.append(5.0)
             elif node_label[n] == 'S':
-                colors.append('darkgreen')
+                colors.append('dodgerblue')
                 size.append(100.0)
         
         # Format the edges in the network
         edge_color = []
+        edge_width = []
         for e in edgelist:
             if e in edge_label: 
                 edge = e
@@ -710,34 +711,37 @@ class Display:
                 edge = (e[1],e[0])
             if edge_label[edge] == 'P':
                 edge_color.append('black')
+                edge_width.append(2.0)
             elif edge_label[edge] == 'S':
                 edge_color.append('crimson')
+                edge_width.append(1.0)
             else:
-                edge_color.append('darkgreen')
+                edge_color.append('dodgerblue')
+                edge_width.append(2.0)
         
         fig = plt.figure(figsize=(15,15))
         ax = fig.add_subplot(111)
         nx.draw_networkx(self.dist_net,pos=nodepos,with_labels=False,
                          ax=ax,node_size=size,node_color=colors,
-                         edgelist=edgelist,edge_color=edge_color)
+                         edgelist=edgelist,edge_color=edge_color,width=edge_width)
         
-        ax.set_title("Distribution Network in Montgomery County",fontsize=20)
-        ax.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-        ax.set_xlabel("Longitude",fontsize=20)
-        ax.set_ylabel("Latitude",fontsize=20)
+        ax.set_title("Distribution Network in Montgomery County",fontsize=30)
+        ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+        # ax.set_xlabel("Longitude",fontsize=20)
+        # ax.set_ylabel("Latitude",fontsize=20)
         
         # Define legends for the plot
-        leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=10),
-                    Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='o',markersize=10),
-                    Line2D([0], [0], color='darkgreen', markerfacecolor='darkgreen', marker='o',markersize=10),
-                    Line2D([0], [0], color='white', markerfacecolor='blue', marker='o',markersize=10),
+        leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=0),
+                    Line2D([0], [0], color='crimson', markerfacecolor='crimson', marker='o',markersize=0),
+                    Line2D([0], [0], color='dodgerblue', markerfacecolor='dodgerblue', marker='o',markersize=0),
+                    Line2D([0], [0], color='white', markerfacecolor='green', marker='o',markersize=10),
                     Line2D([0], [0], color='white', markerfacecolor='red', marker='o',markersize=10),
-                    Line2D([0], [0], color='white', markerfacecolor='darkgreen', marker='o',markersize=10)]
+                    Line2D([0], [0], color='white', markerfacecolor='dodgerblue', marker='o',markersize=10)]
         ax.legend(leglines,['primary network','secondary network','high voltage feeders',
                             'transformers','residences','substation'],
                   loc='best',ncol=2,prop={'size': 20})
         
-        fig.savefig("{}{}.png".format(path,filename))
+        fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
         return
     
     def save_network(self,path,filename):
@@ -807,19 +811,19 @@ class Display:
         fig = plt.figure(figsize=(18,15))
         ax = fig.add_subplot(111)
         nx.draw_networkx(self.dist_net, nodepos, ax=ax, node_color=colors,
-            node_size=10, cmap='viridis', with_labels=False, vmin=0.7, vmax=1.0)
-        cobj = cm.ScalarMappable(cmap='viridis')
-        cobj.set_clim(vmin=0.7,vmax=1.0)
+            node_size=15, cmap=plt.cm.plasma, with_labels=False, vmin=0.85, vmax=1.05)
+        cobj = cm.ScalarMappable(cmap='plasma')
+        cobj.set_clim(vmin=0.85,vmax=1.05)
         cbar = fig.colorbar(cobj,ax=ax)
-        cbar.set_label('Voltage(pu)',size=20)
+        cbar.set_label('Voltage(pu)',size=30)
         cbar.ax.tick_params(labelsize=20)
-        ax.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-        ax.set_xlabel('Longitude',fontsize=20)
-        ax.set_ylabel('Latitude',fontsize=20)
-        ax.set_title('Operating voltage at the nodes in the distribution network',
-                     fontsize=20)
+        ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+        # ax.set_xlabel('Longitude',fontsize=20)
+        # ax.set_ylabel('Latitude',fontsize=20)
+        ax.set_title('Node voltages in the distribution network',
+                     fontsize=30)
         
-        fig.savefig("{}{}.png".format(path,filename))
+        fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
         return colors
     
     def check_flows(self,path,filename):
@@ -842,30 +846,31 @@ class Display:
         p = np.array([nodeload[h] for h in nodelist])
         f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
         
-        flows = {e:f[i] for i,e in enumerate(edgelist)}
+        from math import log
+        flows = {e:log(abs(f[i])) for i,e in enumerate(edgelist)}
         # edgelabel = nx.get_edge_attributes(self.dist_net,'label')
-        colors = [abs(flows[e]) for e in edgelist]
-        fmin = 0
-        fmax = 0.3
+        colors = [flows[e] for e in edgelist]
+        fmin = 0.2
+        fmax = 400.0
         
         # Generate visual representation
         fig = plt.figure(figsize=(18,15))
         ax = fig.add_subplot(111)
         nx.draw_networkx(self.dist_net, nodepos, ax=ax, edge_color=colors,node_color='black',
-            node_size=0.1, edge_cmap=plt.cm.plasma, with_labels=False, 
-            vmin=fmin, vmax=fmax,width=2)
+            node_size=1.0, edge_cmap=plt.cm.plasma, with_labels=False, 
+            vmin=log(fmin), vmax=log(fmax), width=3)
         cobj = cm.ScalarMappable(cmap='plasma')
         cobj.set_clim(vmin=fmin,vmax=fmax)
         cbar = fig.colorbar(cobj,ax=ax)
-        cbar.set_label('Loading level',size=20)
+        cbar.set_label('Flow along edge in kVA',size=30)
         cbar.ax.tick_params(labelsize=20)
-        ax.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-        ax.set_xlabel('Longitude',fontsize=20)
-        ax.set_ylabel('Latitude',fontsize=20)
-        ax.set_title('Loading level of edges in the distribution network',
-                     fontsize=20)
+        ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+        # ax.set_xlabel('Longitude',fontsize=20)
+        # ax.set_ylabel('Latitude',fontsize=20)
+        ax.set_title('Edge flows in the distribution network',
+                     fontsize=30)
         
-        fig.savefig("{}{}.png".format(path,filename))
+        fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
         return colors
     
     def plot_primary(self,homes,path,filename):
@@ -890,20 +895,21 @@ class Display:
         size = []
         for n in nodelist:
             if node_label[n] == 'T':
-                colors.append('blue')
-                size.append(4.0)
+                colors.append('green')
+                size.append(20.0)
             elif node_label[n] == 'H':
                 colors.append('red')
-                size.append(2.0)
+                size.append(5.0)
             elif node_label[n] == 'R':
                 colors.append('black')
-                size.append(1.0)
+                size.append(5.0)
             elif node_label[n] == 'S':
-                colors.append('darkgreen')
+                colors.append('dodgerblue')
                 size.append(100.0)
         
         # Format the edges in the network
         edge_color = []
+        edge_width = []
         for e in edgelist:
             if e in edge_label: 
                 edge = e
@@ -911,30 +917,33 @@ class Display:
                 edge = (e[1],e[0])
             if edge_label[edge] == 'P':
                 edge_color.append('black')
+                edge_width.append(2.0)
             elif edge_label[edge] == 'S':
                 edge_color.append('crimson')
+                edge_width.append(1.0)
             else:
-                edge_color.append('darkgreen')
+                edge_color.append('dodgerblue')
+                edge_width.append(2.0)
         
         fig = plt.figure(figsize=(15,15))
         ax = fig.add_subplot(111)
         nx.draw_networkx(graph,pos=nodepos,with_labels=False,
                          ax=ax,node_size=size,node_color=colors,
-                         edgelist=edgelist,edge_color=edge_color)
+                         edgelist=edgelist,edge_color=edge_color,width=edge_width)
         
-        ax.set_title("Distribution Network in Montgomery County",fontsize=20)
-        ax.tick_params(left=True,bottom=True,labelleft=True,labelbottom=True)
-        ax.set_xlabel("Longitude",fontsize=20)
-        ax.set_ylabel("Latitude",fontsize=20)
+        ax.set_title("Distribution Network in Montgomery County",fontsize=30)
+        ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+        # ax.set_xlabel("Longitude",fontsize=20)
+        # ax.set_ylabel("Latitude",fontsize=20)
         
         # Define legends for the plot
-        leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=10),
-                    Line2D([0], [0], color='darkgreen', markerfacecolor='darkgreen', marker='o',markersize=10),
-                    Line2D([0], [0], color='white', markerfacecolor='blue', marker='o',markersize=10),
-                    Line2D([0], [0], color='white', markerfacecolor='darkgreen', marker='o',markersize=10)]
+        leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=0),
+                    Line2D([0], [0], color='dodgerblue', markerfacecolor='dodgerblue', marker='o',markersize=0),
+                    Line2D([0], [0], color='white', markerfacecolor='green', marker='o',markersize=10),
+                    Line2D([0], [0], color='white', markerfacecolor='dodgerblue', marker='o',markersize=10)]
         ax.legend(leglines,['primary network','high voltage feeders',
                             'transformers','substation'],
                   loc='best',ncol=1,prop={'size': 20})
         
-        fig.savefig("{}{}.png".format(path,filename))
+        fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
         return

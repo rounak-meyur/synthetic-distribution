@@ -12,6 +12,7 @@ import collections
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from scipy import stats
+import seaborn as sns
 
 def create_base(path,filename='hethwood',thresh=2):
     """
@@ -78,21 +79,21 @@ def degree_dist(graph,base,sub,path,fname=None):
     ax.set_xticks(deg + width / 2)
     ax.set_xticklabels([str(x) for x in deg])
     ax.legend((rects1[0],rects2[0]),('Synthetic Network', 'Original Network'),
-              prop={'size': 15})
-    ax.set_ylabel("Percentage of nodes",fontsize=15)
-    ax.set_xlabel("Degree of nodes",fontsize=15)
-    ax.tick_params(axis='both', labelsize=15)
+              prop={'size': 20})
+    ax.set_ylabel("Percentage of nodes",fontsize=20)
+    ax.set_xlabel("Degree of nodes",fontsize=20)
+    ax.tick_params(axis='both', labelsize=20)
     if fname == None:
-        ax.set_title("Degree distribution comparison for synthetic network rooted at "+str(sub),
-                     fontsize=15)
+        ax.set_title("Degree distribution comparison for network rooted at "+str(sub),
+                     fontsize=20)
     else:
         ax.set_title("Degree distribution for "+str(sub)+" with maximum flow:"+fname.split('-')[3],
-                     fontsize=15)
+                     fontsize=20)
     
     # Save the figure
     if fname == None:filename = str(sub)+'-degree-dist'
     else: filename = fname
-    fig.savefig("{}{}.png".format(path,filename))
+    fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
     print("Kolmogorov Smimnov test result:",stats.ks_2samp(degree_sequence_a,
                                                            degree_sequence_b))
     return
@@ -105,7 +106,8 @@ def to_percent(y, position):
     return s
 
 
-def hop_dist(graph,base,sub,path,fname=None):
+def hop_dist(graph,base,sub,path,fname=None,name1='Synthetic Network',
+             name2='Original Network'):
     """
     Creates the hop distribution of the networks. The synthetic network is compared
     with a base network. The hop distribution of both the networks is plotted 
@@ -119,30 +121,45 @@ def hop_dist(graph,base,sub,path,fname=None):
     # nodelabel = nx.get_node_attributes(graph,'label')
     h1 = [nx.shortest_path_length(graph,n,sub) for n in list(graph.nodes())]
     w1 = np.ones_like(h1)/float(len(h1))
-    h2 = [nx.shortest_path_length(base,n,111) for n in list(base.nodes())]
+    h2 = [nx.shortest_path_length(base,n,sub) for n in list(base.nodes())]
     w2 = np.ones_like(h2)/float(len(h2))
     hops = [h1,h2]
     w = [w1,w2]
     bins = range(0,80,2)
     colors = ['lightsalmon','turquoise']
-    labels = ['Synthetic Network','Original Network']
+    labels = [name1,name2]
     fig = plt.figure(figsize=(10,6))
     ax = fig.add_subplot(111)
     ax.hist(hops,bins=bins,weights=w,label=labels,color=colors)
     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
-    ax.set_ylabel("Percentage of nodes",fontsize=15)
-    ax.set_xlabel("Hops from root node",fontsize=15)
-    ax.legend(prop={'size': 15})
-    ax.tick_params(axis='both', labelsize=15)
+    ax.set_ylabel("Percentage of nodes",fontsize=20)
+    ax.set_xlabel("Hops from root node",fontsize=20)
+    ax.legend(prop={'size': 20})
+    ax.tick_params(axis='both', labelsize=20)
     if fname == None:
-        ax.set_title("Hop distribution comparison for synthetic network rooted at "+str(sub),
-                     fontsize=15)
+        ax.set_title("Hop distribution comparison for network rooted at "+str(sub),
+                     fontsize=20)
+    elif fname=='compare':
+        ax.set_title("Hop distribution for two generated synthetic networks",
+                     fontsize=20)
     else:
         ax.set_title("Hop distribution for "+str(sub)+" with maximum flow:"+fname.split('-')[3],
-                     fontsize=15)
+                     fontsize=20)
     
     # Save the figure
     if fname==None:filename = str(sub)+'-hop-dist'
     else: filename=fname
-    fig.savefig("{}{}.png".format(path,filename))
+    fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
     return  
+
+
+def hop_density(graph_list,sub):
+    """
+    """
+    # nodelabel = nx.get_node_attributes(graph,'label')
+    for g in graph_list:
+        h = [nx.shortest_path_length(g,n,sub) for n in list(g.nodes())]
+        sns.distplot(h,hist=False,kde=True,kde_kws = {'shade': False, 'linewidth': 2})
+    return
+
+

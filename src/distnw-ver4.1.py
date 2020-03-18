@@ -13,8 +13,8 @@ workPath = os.getcwd()
 inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
-figPath = workPath + "/figs/prim-ensemble/"
-tmpPath = workPath + "/temp/prim-ensemble/"
+figPath = workPath + "/figs/"
+tmpPath = workPath + "/temp/results-dec12/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
@@ -44,15 +44,13 @@ G = create_base(csvPath,filename='hethwood-ver2')
 
 #%% Ensemble
 sub = 24664
-for fmax in range(100,180,20):
-    fname = str(sub)+'-network-f-'+str(fmax)+'-s-8'
+for sub in [28228,28235,34810,34816,34780]:
+    fname = str(sub)+'-network'
     dist_net = read_network(tmpPath+fname+'.txt',homes)
     nodelab = nx.get_node_attributes(dist_net,'label')
     sec_nodes = [n for n in nodelab if nodelab[n]=='H']
     for n in sec_nodes:
         dist_net.remove_node(n)
         
-    bfs_edges = list(nx.dfs_edges(dist_net,source=sub))[:G.number_of_nodes()]
-    M = dist_net.edge_subgraph(bfs_edges).copy()
-    degree_dist(M,G,sub,figPath,fname=fname+'-degree')
-    hop_dist(M,G,sub,figPath,fname=fname+'-hop')
+    degree_dist(dist_net,G,sub,figPath)
+    hop_dist(dist_net,G,sub,figPath)
