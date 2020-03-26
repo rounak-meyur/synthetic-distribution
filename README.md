@@ -28,9 +28,10 @@ Once the home coordinates are mapped to the nearest road network link, the next 
 6. There should not be any loops in the network. This is ensured by 
 	- the flow constraint since all residences have positive loads and 
 	- considering total number of edges to be equal to the number of residences which are also non-root nodes.
-
-The above constraints are formulated as linear constraints in a mixed integer linear programming (MILP) problem. The objective function of the problem is the total length of all edges in the network. The 
-
+The above constraints are formulated as linear constraints in a mixed integer linear programming (MILP) problem. The objective function of the problem is the total length of all edges in the network. 
+Mapped Residences | Local Transformers | Secondary Network
+:---: | :---: | :---:
+![png](src/figs/sec-org.png) | ![png](src/figs/sec-base.png) | ![png](src/figs/sec-out.png)
 ## Creating the primary distribution network
 The goal is to create the primary distribution network which connects the substations to the local transformers. For this purpose, we aggregate the load at residences to the local transformer locations which have been obtained as an output from the preceding step. The objective of the current step is to connect all these local transformer locations to the substation.
 We assume that the primary distribution network almost follows the road network and therefore the latter may be used as a proxy network for the former. Hence, the goal of the current step is to select edges along the road network graph such that all local transformer locations along road links are covered. The road network nodes which define the road network graph can be considered to be dummy points with no load, while the transformer locations have aggregated residential load demands. The road network nodes are only required to be covered in order to connect the local transformer points. In other words, the road network nodes cannot be leaf nodes in the created primary network.
