@@ -34,3 +34,6 @@ The above constraints are formulated as linear constraints in a mixed integer li
 ## Generating ensemble of synthetic networks 
 ![png](output_step2_ensemble1.png)
 ![png](output_step2_ensemble2.png)
+
+## Creating the primary distribution network
+![png](src/figs/24664-master.png)
