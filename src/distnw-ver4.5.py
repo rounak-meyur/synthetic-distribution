@@ -59,9 +59,10 @@ for theta in theta_range:
     for phi in phi_range:
         ax.plot(Fdist[(theta,phi)],color=((phi-3)/7.0,(theta-300)/100.0,0.0))
 
-ax.set_xlabel("Number of hops from the root",fontsize=15)
-ax.set_ylabel("Cumulative distribution of nodes",fontsize=15)
-
+ax.set_xlabel("Number of hops from the root",fontsize=20)
+ax.set_ylabel("Cumulative probability",fontsize=20)
+ax.set_title("Cumulative hop distribution of nodes in synthetic distribution network",
+             fontsize=20)
 
 #%% Cluster the cpdfs
 from scipy import stats
@@ -95,8 +96,11 @@ while (Dclus>thresh) and (len(centroid)<kmax):
 
 
 #%%Plot the clustered distributions
+from matplotlib.lines import Line2D
 import seaborn as sns
 colors = sns.color_palette(n_colors=len(cluster))
+leglines = [Line2D([0], [0], color=c, lw=4) for c in colors]
+
 fig = plt.figure(figsize=(15,9))
 ax = fig.add_subplot(1,1,1)
 
@@ -104,8 +108,13 @@ for i,cpdf_list in enumerate(list(cluster.values())):
     for c in cpdf_list:
         ax.plot(Fdist[c],color=colors[i])
 
-ax.set_xlabel("Number of hops from the root",fontsize=15)
-ax.set_ylabel("Cumulative distribution of nodes",fontsize=15)
+ax.set_xlabel("Number of hops from the root",fontsize=20)
+ax.set_ylabel("Cumulative probability",fontsize=20)
+ax.set_title("Clustered cumulative hop distribution of nodes for "+str(sub),
+             fontsize=20)
+ax.legend(leglines,['Cluster ' + str(t+1) \
+                    for t in range(len(colors))],\
+                    loc='best',ncol=2,prop={'size': 20})
 fig.savefig("{}{}.png".format(figPath,str(sub)+'-hopdist-cluster'),bbox_inches='tight')
 
 
@@ -117,15 +126,20 @@ for i,cpdf_list in enumerate(list(cluster.values())):
     for c in cpdf_list:
         sns.kdeplot(Hops[c],shade=False,color=colors[i])
 
-ax.set_xlabel("Number of hops from the root",fontsize=15)
-ax.set_ylabel("Kernel density of hop distribution",fontsize=15)
+ax.set_xlabel("Number of hops from the root",fontsize=20)
+ax.set_ylabel("Kernel density",fontsize=20)
+ax.set_title("Clustered kernel density estimator of discrete hop distribution for "+str(sub),
+             fontsize=20)
+ax.legend(leglines,['Cluster ' + str(t+1) \
+                    for t in range(len(colors))],\
+                    loc='best',ncol=2,prop={'size': 20})
 fig.savefig("{}{}.png".format(figPath,str(sub)+'-hopdist-kde-cluster'),bbox_inches='tight')
 
 
 
 
 
-
+cluster_24665 = cluster
 
 
 
