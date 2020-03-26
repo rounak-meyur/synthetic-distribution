@@ -47,5 +47,6 @@ Degree Distribution | Hop Distribution
 :---: | :---:
 ![png](src/figs/24664-degree-dist.png) | ![png](src/figs/24664-hop-dist.png)
 ## Generating ensemble of synthetic networks 
-![png](output_step2_ensemble1.png)
-![png](output_step2_ensemble2.png)
+Cumulative Hop Distribution | Kernel Density Estimates
+:---: | :---:
+![png](src/figs/24664-hopdist-cluster.png) | ![png](src/figs/24664-hopdist-kde-cluster.png)
