@@ -36,7 +36,9 @@ Mapped Residences | Local Transformers | Secondary Network
 
 ## Creating the primary distribution network
 The goal is to create the primary distribution network which connects the substations to the local transformers. For this purpose, we aggregate the load at residences to the local transformer locations which have been obtained as an output from the preceding step. The objective of the current step is to connect all these local transformer locations to the substation.
+
 We assume that the primary distribution network almost follows the road network and therefore the latter may be used as a proxy network for the former. Hence, the goal of the current step is to select edges along the road network graph such that all local transformer locations along road links are covered. The road network nodes which define the road network graph can be considered to be dummy points with no load, while the transformer locations have aggregated residential load demands. The road network nodes are only required to be covered in order to connect the local transformer points. In other words, the road network nodes cannot be leaf nodes in the created primary network.
+
 Finally, a substation can have multiple feeder lines connecting different local group of residences. This is usual in a rural geographic region where such local groups are distinctly observable. Therefore, the primary network may be created as a forest of trees with the roots connected to the substation though high voltage feeder lines. The trees are rooted at some road network node and covers all the local transformers.
 Road network | Primary Network | Entire Network
 :---: | :---: | :---:
