@@ -36,4 +36,6 @@ The above constraints are formulated as linear constraints in a mixed integer li
 ![png](output_step2_ensemble2.png)
 
 ## Creating the primary distribution network
+Road network | Primary Network | Entire Network
+--- | --- | ---
 ![png](src/figs/24664-master.png) | ![png](src/figs/24664-primary.png) | ![png](src/figs/24664-network.png)
