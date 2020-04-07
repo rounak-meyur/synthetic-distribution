@@ -257,7 +257,7 @@ def plot_graph(graph,subdata=None,path=None,filename=None):
     if path != None:
         fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
     return
-    
+
 
 #%% Classes
 class Link(LineString):
