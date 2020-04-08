@@ -160,9 +160,9 @@ class PFSol:
         fig = plt.figure(figsize=(18,15))
         ax = fig.add_subplot(111)
         nx.draw_networkx(self.dist_net, nodepos, ax=ax, node_color=colors,
-            node_size=10, cmap=plt.cm.plasma, with_labels=False, vmin=0.85, vmax=1.02)
+            node_size=10, cmap=plt.cm.plasma, with_labels=False, vmin=0.9, vmax=1.05)
         cobj = cm.ScalarMappable(cmap='plasma')
-        cobj.set_clim(vmin=0.85,vmax=1.02)
+        cobj.set_clim(vmin=0.9,vmax=1.05)
         cbar = fig.colorbar(cobj,ax=ax)
         cbar.set_label('Voltage(pu)',size=30)
         cbar.ax.tick_params(labelsize=20)
@@ -175,7 +175,7 @@ class PFSol:
     def update_flows(self,i,tmppath):
         """
         """
-        base = 1.2
+        base = 2
         nodepos = nx.get_node_attributes(self.dist_net,'cord')
         colors = [log(self.flows[e][i],base) for e in list(self.dist_net.edges())]
         # Generate visual representation
