@@ -179,8 +179,8 @@ class PFSol:
         nodepos = nx.get_node_attributes(self.dist_net,'cord')
         colors = [log(self.flows[e][i],base) for e in list(self.dist_net.edges())]
         # Generate visual representation
-        fmin = 0.2
-        fmax = 400.0
+        fmin = 100.0
+        fmax = 300.0
         plt.ioff()
         fig = plt.figure(figsize=(18,15))
         ax = fig.add_subplot(111)
