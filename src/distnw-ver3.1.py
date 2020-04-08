@@ -16,19 +16,16 @@ tmpPath = workPath + "/temp/results-dec12/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
-from pyBuildNetworklib import read_network
-
+from pyImgHelperlib import PFSol, read_network
 q_object = Query(csvPath)
 _,homes = q_object.GetHomes()
 sub = 24664
 dist_net = read_network(tmpPath+str(sub)+'-network.txt',homes)
 
 #%% Display the networks
-from pyBuildNetworklib import Display
-D = Display(dist_net)
-# D.plot_network(figPath,str(sub)+'-networktest')
-# D.plot_primary(homes,figPath,str(sub)+'-primarytest')
-# D.check_pf(figPath,str(sub)+'-voltagetest')
-# D.check_flows(figPath,str(sub)+'-flowtest')
 
+D = PFSol(dist_net)
+D.run_pf()
+D.volt_gif(figPath+"tmp/",figPath+str(sub)+"-voltage")
+D.flow_gif(figPath+"tmp/",figPath+str(sub)+"-flows")
 

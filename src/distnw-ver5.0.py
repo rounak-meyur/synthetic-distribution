@@ -141,8 +141,8 @@ _,homes = q_object.GetHomes()
 #%% Ensemble
 
 sub = 24664
-theta_range = range(300,401,5)
-phi_range = range(3,11)
+theta_range = range(200,301,5)
+phi_range = [8]
 
 
 W = []
@@ -158,4 +158,4 @@ for theta in theta_range:
 
 import pandas as pd
 df = pd.DataFrame(data=W)
-df.to_csv("eigval-"+str(sub)+".csv",index=False)
+df.to_csv(csvPath + "eigval-"+str(sub)+"all.csv",index=False)
