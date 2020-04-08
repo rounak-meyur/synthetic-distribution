@@ -168,15 +168,16 @@ class PFSol:
         cbar.ax.tick_params(labelsize=20)
         ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
         ax.set_title('Time of Day:'+str(1+i),fontsize=30)
-        fig.savefig(tmppath+str(i)+".png")
+        fig.savefig(tmppath+str(i)+".png",bbox_inches='tight')
         plt.close()
         return
     
     def update_flows(self,i,tmppath):
         """
         """
+        base = 1.2
         nodepos = nx.get_node_attributes(self.dist_net,'cord')
-        colors = [log(self.flows[e][i],2.0) for e in list(self.dist_net.edges())]
+        colors = [log(self.flows[e][i],base) for e in list(self.dist_net.edges())]
         # Generate visual representation
         fmin = 0.2
         fmax = 400.0
@@ -185,7 +186,7 @@ class PFSol:
         ax = fig.add_subplot(111)
         nx.draw_networkx(self.dist_net, nodepos, ax=ax, edge_color=colors,node_color='black',
             node_size=1.0, edge_cmap=plt.cm.plasma, with_labels=False, 
-            vmin=log(fmin), vmax=log(fmax), width=2)
+            vmin=log(fmin,base), vmax=log(fmax,base), width=2)
         cobj = cm.ScalarMappable(cmap='plasma')
         cobj.set_clim(vmin=fmin,vmax=fmax)
         cbar = fig.colorbar(cobj,ax=ax)
@@ -193,7 +194,7 @@ class PFSol:
         cbar.ax.tick_params(labelsize=20)
         ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
         ax.set_title('Time of Day:'+str(1+i),fontsize=30)
-        fig.savefig(tmppath+str(i)+".png")
+        fig.savefig(tmppath+str(i)+".png",bbox_inches='tight')
         plt.close()
         return
     
