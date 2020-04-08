@@ -45,13 +45,20 @@ Road network | Primary Network | Entire Network
 ![png](src/figs/24664-master.png) | ![png](src/figs/24664-primary.png) | ![png](src/figs/24664-network.png)
 
 ## Validating the created synthetic networks
+# Operational Validation
 Node Voltages | Edge power flows
 :---: | :---:
 ![png](src/figs/24664-voltage.png) | ![png](src/figs/24664-flows.png)
 
+# Structural Validation
 Degree Distribution | Hop Distribution
 :---: | :---:
 ![png](src/figs/24664-degree-dist.png) | ![png](src/figs/24664-hop-dist.png)
+
+# Power Flow throughout the day
+Node Voltages | Edge power flows
+:---: | :---:
+![png](src/figs/24664-voltage.gif) | ![png](src/figs/24664-flows.gif)
 
 ## Generating ensemble of synthetic networks 
 Cumulative Hop Distribution | Kernel Density Estimates
