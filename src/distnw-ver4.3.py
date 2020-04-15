@@ -3,6 +3,8 @@
 Created on Mon Feb  3 19:33:51 2020
 
 @author: Rounak
+Description: This program analyzes the effect of varying optimization parameters in
+the generated networks.
 """
 
 import networkx as nx
@@ -58,7 +60,7 @@ from numpy import genfromtxt
 K = genfromtxt(csvPath+'K-stat.csv', delimiter=',')
 
 #%% Heat map generation
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 # fig = plt.figure(figsize=(20,20))
 # ax = fig.add_subplot(111)
@@ -99,6 +101,46 @@ K = genfromtxt(csvPath+'K-stat.csv', delimiter=',')
 # ax.set_title("Heatmap of Kolmogorov Smirnov Statistic for comparing hop distribution of synthetic networks",
 #              fontsize=20)
 
+#%% Heat Map in 3D
+# from scipy import stats
+# from mpl_toolkits.mplot3d import Axes3D
+# import matplotlib.pyplot as plt
+# from matplotlib import cm
+# from matplotlib.ticker import LinearLocator, FormatStrFormatter
+
+# fig = plt.figure(figsize=(20,12))
+# ax = fig.gca(projection='3d')
+
+# # Make data.
+# ref = dict_hops[(350,8)]
+# theta = np.arange(300, 401, 5)
+# phi = np.arange(3, 11, 1)
+# X, Y = np.meshgrid(theta, phi)
+
+# @np.vectorize
+# def kstat(x,y):
+#     return stats.ks_2samp(dict_hops[(x,y)],ref)[0]
+
+# Z = kstat(X,Y)
+
+# # Plot the surface.
+# surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+#                        linewidth=0, antialiased=False)
+
+
+# # Customize the z axis.
+# ax.set_zlim(0, 0.1)
+# ax.zaxis.set_major_locator(LinearLocator(5))
+# # ax.set_xlim(300, 400)
+# # ax.xaxis.set_major_locator(LinearLocator(10))
+# ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+
+# # Add a color bar which maps values to colors.
+# fig.colorbar(surf, shrink=0.5, aspect=5)
+
+# ax.set_ylabel('Maximum number of feeders',fontsize=20)
+# ax.set_xlabel('Maximum substation rating',fontsize=20)
+# ax.set_zlabel('Kolmogorv Smirnov statistic',fontsize=20)
 
 #%% K statistics
 diff_theta = []

@@ -177,7 +177,7 @@ class MILP_primary:
     network for covering a given set of local transformers through the edges of
     an existing road network.
     """
-    def __init__(self,graph,tnodes,flow=400,feeder=10):
+    def __init__(self,graph,tnodes,flow=400,feeder=10, pf=True):
         """
         graph: the base graph which has the list of possible edges.
         tnodes: dictionary of transformer nodes with power consumption as value.
@@ -200,7 +200,7 @@ class MILP_primary:
         self.model = grb.Model(name="Get Primary Network")
         self.model.ModelSense = grb.GRB.MINIMIZE
         self.__variables()
-        self.__powerflow()
+        if pf: self.__powerflow()
         self.__radiality()
         self.__flowconstraint(M=flow)
         self.__connectivity()

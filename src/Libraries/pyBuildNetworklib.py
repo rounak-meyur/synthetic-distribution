@@ -570,7 +570,7 @@ class Primary:
                 self.__get_partitions(sg_list)
         return
     
-    def optimal_network(self,fmax=400,feedmax=10):
+    def optimal_network(self,fmax=400,feedmax=10,opt=True):
         """
         Solve the MILP optimization problem to obtain the primary distribution with
         multiple feeders.
@@ -582,7 +582,8 @@ class Primary:
             agg_load = nx.get_node_attributes(subgraph,'load')
             nlabel = nx.get_node_attributes(subgraph,'label')
             dict_tsfr = {n:agg_load[n] for n in nodelist if nlabel[n]=='T'}
-            M = MILP_primary(subgraph,dict_tsfr,flow=fmax,feeder=feedmax)
+            M = MILP_primary(subgraph,dict_tsfr,
+                             flow=fmax,feeder=feedmax,pf=opt)
             print("#####################Optimization Ended#####################")
             print("\n\n")
             primary += M.optimal_edges
@@ -591,11 +592,12 @@ class Primary:
         return primary,roots,tnodes
         
     
-    def get_sub_network(self,sec_file,flowmax=400,feedermax=10):
+    def get_sub_network(self,sec_file,flowmax=400,feedermax=10,opt_pf=True):
         """
         """
         # Optimizaton problem to get the primary network
-        primary,roots,tnodes = self.optimal_network(fmax=flowmax,feedmax=feedermax)            
+        primary,roots,tnodes = self.optimal_network(fmax=flowmax,
+                                                    feedmax=feedermax,opt=opt_pf)            
         
         # Get the associated secondary distribution network
         secondary = self.get_secondary(sec_file,tnodes)

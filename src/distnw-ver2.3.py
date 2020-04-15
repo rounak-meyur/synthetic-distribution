@@ -20,8 +20,8 @@ workPath = os.getcwd()
 inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
-figPath = workPath + "/figs/prim-ensemble/"
-tmpPath = workPath + "/temp/prim-ensemble/"
+figPath = workPath + "/figs/ensemble-nopf/"
+tmpPath = workPath + "/temp/ensemble-nopf/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
@@ -49,16 +49,21 @@ secondary_network_file = inpPath + 'secondary-network.txt'
 #%% Initialize Primary Network Generation Process
 graph,S2Node = init(subs,roads,tsfr,links)
 
-sub = 24665
+sub = 24664
 substation = nt("local_substation",field_names=["id","cord","nodes"])
 sub_data = substation(id=sub,cord=subs.cord[sub],nodes=S2Node[sub])
 
 #%% Generate primary distribution network
-
-for fmax in range(400,401,5):
-    for feed in range(3,11):
+f_range = [800]
+for fmax in f_range:
+    for feed in range(1,3):
+        print("##############################################################")
+        print("####### max feeder"+str(feed)+", max limit"+str(fmax)+" ######")
+        print("##############################################################")
+        
         P = Primary(sub_data,homes,graph)
-        P.get_sub_network(secondary_network_file,flowmax=fmax,feedermax=feed)
+        P.get_sub_network(secondary_network_file,
+                          flowmax=fmax,feedermax=feed,opt_pf=False)
         dist_net = P.dist_net
         D = Display(dist_net)
         filename = str(sub)+'-network-f-'+str(fmax)+'-s-'+str(feed)
@@ -71,9 +76,7 @@ for fmax in range(400,401,5):
             print("No cycles found!!!")
             pass
     
-        print("##############################################################")
-        print("##############################################################")
-        print("##############################################################")
+        
 
 
 

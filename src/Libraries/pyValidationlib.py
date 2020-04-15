@@ -121,7 +121,7 @@ def hop_dist(graph,base,sub,path,fname=None,name1='Synthetic Network',
     # nodelabel = nx.get_node_attributes(graph,'label')
     h1 = [nx.shortest_path_length(graph,n,sub) for n in list(graph.nodes())]
     w1 = np.ones_like(h1)/float(len(h1))
-    h2 = [nx.shortest_path_length(base,n,sub) for n in list(base.nodes())]
+    h2 = [nx.shortest_path_length(base,n,111) for n in list(base.nodes())]
     w2 = np.ones_like(h2)/float(len(h2))
     hops = [h1,h2]
     w = [w1,w2]

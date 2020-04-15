@@ -14,7 +14,7 @@ inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
 figPath = workPath + "/figs/"
-tmpPath = workPath + "/temp/results-dec12/"
+tmpPath = workPath + "/temp/ensemble-nopf/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
@@ -44,8 +44,10 @@ G = create_base(csvPath,filename='hethwood-ver2')
 
 #%% Ensemble
 sub = 24664
-for sub in [28228,28235,34810,34816,34780]:
-    fname = str(sub)+'-network'
+thetaphi_range = [(200,5),(400,4),(800,1)]
+# for sub in [28228,28235,34810,34816,34780]:
+for theta,phi in thetaphi_range:
+    fname = str(sub)+'-network-f-'+str(theta)+'-s-'+str(phi)
     dist_net = read_network(tmpPath+fname+'.txt',homes)
     nodelab = nx.get_node_attributes(dist_net,'label')
     sec_nodes = [n for n in nodelab if nodelab[n]=='H']

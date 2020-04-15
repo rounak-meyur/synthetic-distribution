@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Feb  3 19:33:51 2020
+Created on Mon Aug 19 19:57:15 2019
 
-@author: Rounak
+Author: Rounak Meyur
+Description: This program tries to analyze ensemble of synthetic networks by considering
+the power flow Jacobian and its eigen values
 """
-
-import networkx as nx
-import numpy as np
-# from scipy import stats
 
 import sys,os
 workPath = os.getcwd()
@@ -15,11 +13,141 @@ inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
 figPath = workPath + "/figs/"
-tmpPath = workPath + "/temp/prim-ensemble/"
+tmpPath = workPath + "/temp/ensemble-nopf/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
 from pyBuildNetworklib import read_network
+
+
+#%% Compute Jacobian
+import numpy as np
+import networkx as nx
+
+def getYbus(G):
+    """
+    Generates the Ybus matrix for the networkx graph
+
+    Parameters
+    ----------
+    G : TYPE Networkx Graph with attributes 'r' and 'x'
+        DESCRIPTION A networkx graph representing the distribution network.
+
+    Returns
+    -------
+    Ybus:   TYPE Scipy sparse matrix
+            DESCRIPTION The bus admittance matrix which is the weighted Laplacian of
+            the network.
+    """
+    nodelabel = nx.get_node_attributes(G,'label')
+    node_ind = [i for i,node in enumerate(G.nodes()) \
+                if nodelabel[node] != 'S']
+    dict_y = {e:1.0/(G[e[0]][e[1]]['r']+1j*G[e[0]][e[1]]['x']) \
+              for e in list(G.edges())}
+    nx.set_edge_attributes(G,dict_y,'y')
+    Ybus = nx.laplacian_matrix(G, nodelist=list(G.nodes()), weight='y').toarray()
+    return Ybus[node_ind,:][:,node_ind]
+
+def check_pf(G):
+    """
+    Checks power flow solution and plots the voltage at different nodes in the 
+    network through colorbars.
+    """
+    A = nx.incidence_matrix(G,nodelist=list(G.nodes()),
+                            edgelist=list(G.edges()),oriented=True).toarray()
+    
+    nodelabel = nx.get_node_attributes(G,'label')
+    nodeload = nx.get_node_attributes(G,'load')
+    node_ind = [i for i,node in enumerate(G.nodes()) \
+                if nodelabel[node] != 'S']
+    nodelist = [node for node in list(G.nodes()) if nodelabel[node] != 'S']
+    
+    # Resistance data
+    R = np.diag([1.0/G[e[0]][e[1]]['r'] for e in list(G.edges())])
+    G = np.matmul(np.matmul(A,R),A.T)[node_ind,:][:,node_ind]
+    p = np.array([nodeload[h] for h in nodelist])
+    q = 0.328*p
+    
+    dv = np.matmul(np.linalg.inv(G),p)
+    v = 1.0-dv
+    return p,q,v
+
+def getJacobian(Y,p,q,v,theta):
+    """
+    Gets the the Jacobian matrix: 
+        H: partial derivative of real power with respect to the voltage angles.
+        N: partial derivative of real power with respect to the voltage magnitudes.
+        M: partial derivative of reactive power with respect to the voltage angles.
+        L: partial derivative of reactive power with respect to the voltage magnitudes.
+
+    Parameters
+    ----------
+    Y : TYPE
+        DESCRIPTION.
+    p : TYPE
+        DESCRIPTION.
+    q : TYPE
+        DESCRIPTION.
+    v : TYPE
+        DESCRIPTION.
+    theta : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    nb = v.shape[0]
+    G = Y.real
+    B = Y.imag
+    H = np.zeros(shape=(nb,nb))
+    N = np.zeros(shape=(nb,nb))
+    M = np.zeros(shape=(nb,nb))
+    L = np.zeros(shape=(nb,nb))
+    for m in range(nb):
+        for n in range(nb):
+            if m!=n: 
+                H[m,n] = v[m]*v[n]*((G[m,n]*np.sin(theta[m]-theta[n]))-\
+                                    (B[m,n]*np.cos(theta[m]-theta[n])))
+                N[m,n] = v[m]*v[n]*((G[m,n]*np.cos(theta[m]-theta[n]))+\
+                                    (B[m,n]*np.sin(theta[m]-theta[n])))
+                M[m,n] = -v[m]*v[n]*((G[m,n]*np.cos(theta[m]-theta[n]))+\
+                                    (B[m,n]*np.sin(theta[m]-theta[n])))
+                L[m,n] = v[m]*v[n]*((G[m,n]*np.sin(theta[m]-theta[n]))-\
+                                    (B[m,n]*np.cos(theta[m]-theta[n])))
+            else:
+                H[m,m] = -q[m]-B[m,m]*v[m]*v[m]
+                N[m,m] = p[m]+G[m,m]*v[m]*v[m]
+                M[m,m] = p[m]-G[m,m]*v[m]*v[m]
+                L[m,m] = q[m]-B[m,m]*v[m]*v[m]
+    return np.concatenate((np.concatenate((H,N),axis=1),
+                           np.concatenate((M,L),axis=1)),axis=0)
+
+def get_EVD(graph):
+    p,q,v = check_pf(graph)
+    theta = np.zeros(shape=(v.shape[0],))
+    Y = getYbus(graph)
+    J = getJacobian(Y,p,q,v,theta)
+    w,_ = np.linalg.eig(J)
+    return np.sort(abs(w))
+
+
+def FlatEVD(graph):
+    nodelabel = nx.get_node_attributes(graph,'label')
+    nodeload = nx.get_node_attributes(graph,'load')
+    nodelist = [node for node in list(graph.nodes()) if nodelabel[node] != 'S']
+    p = np.array([nodeload[h] for h in nodelist])
+    q = 0.328*p
+    Y = getYbus(graph)
+    H = -Y.imag-np.diag(q)
+    N = Y.real+np.diag(p)
+    M = -Y.real+np.diag(p)
+    L = -Y.imag+np.diag(q)
+    J = np.concatenate((np.concatenate((H,N),axis=1),
+                        np.concatenate((M,L),axis=1)),axis=0)
+    w,_ = np.linalg.eig(J)
+    return np.sort(abs(w))
 
 
 #%% Create the plots
@@ -28,152 +156,50 @@ _,homes = q_object.GetHomes()
 
 
 #%% Ensemble
-import matplotlib.pyplot as plt
+
+# sub = 24664
+# theta_range = range(200,601,20)
+# phi_range = [4,5,6,7]
 
 
-sub = 24665
-theta_range = range(300,401,5)
-phi_range = range(3,11)
+# W = []
+# for theta in theta_range:
+#     for phi in phi_range:
+#         print(theta,phi)
+#         # Create the cumulative distribution for a given (theta,phi) pair
+#         fname = str(sub)+'-network-f-'+str(theta)+'-s-'+str(phi)
+#         graph = read_network(tmpPath+fname+'.txt',homes)
+#         W.append(FlatEVD(graph))
 
+# log_data = [np.log10(x) for x in W]
 
-Fdist = {}
-Hops = {}
-for theta in theta_range:
-    for phi in phi_range:
-        # Create the cumulative distribution for a given (theta,phi) pair
-        fname = str(sub)+'-network-f-'+str(theta)+'-s-'+str(phi)
-        graph = read_network(tmpPath+fname+'.txt',homes)
-        
-        
-        N = graph.number_of_nodes()
-        Hops[(theta,phi)] = np.array([nx.shortest_path_length(graph,n,sub) \
-                                      for n in list(graph.nodes())])
-        Fdist[(theta,phi)] = np.array([np.sum(Hops[(theta,phi)]<=k)/N \
-                                       for k in range(100)])
-    
-#%%Plot the distributions
-fig = plt.figure(figsize=(15,9))
+#%% Ensemble 2
+
+sub = 24664
+
+thetaphi_range = [(200,5),(400,4),(800,1)]
+W = []
+for theta,phi in thetaphi_range:
+    print(theta,phi)
+    # Create the cumulative distribution for a given (theta,phi) pair
+    fname = str(sub)+'-network-f-'+str(theta)+'-s-'+str(phi)
+    graph = read_network(tmpPath+fname+'.txt',homes)
+    W.append(FlatEVD(graph))
+
+log_data = [np.log10(x) for x in W]
+
+#%% PLot the eigenvalues
+import matplotlib.pyplot as plt 
+fig = plt.figure(figsize=(20,12))
 ax = fig.add_subplot(1,1,1)
+box = ax.boxplot(log_data,patch_artist=True)
+plt.xticks([1,2,3], ["Max limit: 200, Max feeder:5","Max limit: 400, Max feeder:5",
+                     "Max limit: 800, Max feeder:1"])
+# ax.tick_params(bottom=False,labelbottom=False)
+ax.set_xlabel("Synthetic networks",fontsize=20)
+ax.set_ylabel("Log transformed eigenvalues of Jacobian",fontsize=20)
+fig.savefig(figPath+str(sub)+"-nopfflateigmod.png")
 
-for theta in theta_range:
-    for phi in phi_range:
-        ax.plot(Fdist[(theta,phi)],color=((phi-3)/7.0,(theta-300)/100.0,0.0))
-
-ax.set_xlabel("Number of hops from the root",fontsize=20)
-ax.set_ylabel("Cumulative probability",fontsize=20)
-ax.set_title("Cumulative hop distribution of nodes in synthetic distribution network",
-             fontsize=20)
-
-#%% Cluster the cpdfs
-from scipy import stats
-
-thresh = 0.01
-kmax = 10
-index_list =list(Hops.keys()) 
-centroid = [index_list[0]]
-Dclus = 10
-
-cluster = {index_list[0]:index_list}
-
-while (Dclus>thresh) and (len(centroid)<kmax):
-    # intra-cluster distance computation
-    for i in range(len(centroid)):
-        D = [stats.ks_2samp(Hops[l],Hops[centroid[i]])[0] for l in cluster[centroid[i]]]
-        Dclus = max(D)
-        if (Dclus>thresh) and (len(centroid)<kmax):
-            centroid.append(cluster[centroid[i]][np.argmax(np.array(D))])
-    
-    # centroid to cpdf distance computation
-    cluster = {k:[] for k in centroid}
-    for j in range(len(Hops)):
-        # iterate over each cpdf
-        Dstat = []
-        for i in range(len(centroid)):
-            # find distance of cpdf from each cluster centroid
-            Dstat.append(stats.ks_2samp(Hops[index_list[j]],Hops[centroid[i]])[0])
-        # Find the cluster to which the cpdf belongs
-        cluster[centroid[np.argmin(np.array(Dstat))]].append(index_list[j]) 
-
-
-#%%Plot the clustered distributions
-from matplotlib.lines import Line2D
-import seaborn as sns
-colors = sns.color_palette(n_colors=len(cluster))
-leglines = [Line2D([0], [0], color=c, lw=4) for c in colors]
-
-fig = plt.figure(figsize=(15,9))
-ax = fig.add_subplot(1,1,1)
-
-for i,cpdf_list in enumerate(list(cluster.values())):
-    for c in cpdf_list:
-        ax.plot(Fdist[c],color=colors[i])
-
-ax.set_xlabel("Number of hops from the root",fontsize=20)
-ax.set_ylabel("Cumulative probability",fontsize=20)
-ax.set_title("Clustered cumulative hop distribution of nodes for "+str(sub),
-             fontsize=20)
-ax.legend(leglines,['Cluster ' + str(t+1) \
-                    for t in range(len(colors))],\
-                    loc='best',ncol=2,prop={'size': 20})
-fig.savefig("{}{}.png".format(figPath,str(sub)+'-hopdist-cluster'),bbox_inches='tight')
-
-
-#%% Plot the KDE
-fig = plt.figure(figsize=(15,9))
-ax = fig.add_subplot(1,1,1)
-
-for i,cpdf_list in enumerate(list(cluster.values())):
-    for c in cpdf_list:
-        sns.kdeplot(Hops[c],shade=False,color=colors[i])
-
-ax.set_xlabel("Number of hops from the root",fontsize=20)
-ax.set_ylabel("Kernel density",fontsize=20)
-ax.set_title("Clustered kernel density estimator of discrete hop distribution for "+str(sub),
-             fontsize=20)
-ax.legend(leglines,['Cluster ' + str(t+1) \
-                    for t in range(len(colors))],\
-                    loc='best',ncol=2,prop={'size': 20})
-fig.savefig("{}{}.png".format(figPath,str(sub)+'-hopdist-kde-cluster'),bbox_inches='tight')
-
-
-
-
-
-cluster_24665 = cluster
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# import pandas as pd
+# df = pd.DataFrame(data=W)
+# df.to_csv(csvPath + "eigval-"+str(sub)+"all.csv",index=False)
