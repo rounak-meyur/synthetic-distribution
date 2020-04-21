@@ -7,7 +7,7 @@ Description: This library contains functions and classes to formulate an MILP
 required to solve the optimal network construction problem, scheduling electric
 vehicles etc.
 """
-import sys
+import sys,os
 import networkx as nx
 import gurobipy as grb
 import numpy as np
@@ -44,6 +44,8 @@ class MILP_secondary:
     def __init__(self,graph,roots):
         """
         """
+        suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
+        self.tmp = os.getcwd()+"/temp/gurobi/"+suffix+"-"
         self.edges = list(graph.edges())
         self.nodes = list(graph.nodes())
         print("Number of edges:",len(self.edges))
@@ -67,7 +69,7 @@ class MILP_secondary:
         self.__heuristic()
         self.__powerflow()
         self.__objective()
-        self.model.write("secondary.lp")
+        self.model.write(self.tmp+"secondary.lp")
         self.optimal_edges = self.__solve()
         return
     
@@ -145,7 +147,7 @@ class MILP_secondary:
         grb.setParam('Heuristics', 0)
         
         # Open log file
-        logfile = open('gurobi.log', 'w')
+        logfile = open(self.tmp+'gurobi.log', 'w')
         
         # Pass data into my callback function
         self.model._lastiter = -grb.GRB.INFINITY
@@ -182,6 +184,8 @@ class MILP_primary:
         graph: the base graph which has the list of possible edges.
         tnodes: dictionary of transformer nodes with power consumption as value.
         """
+        suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
+        self.tmp = os.getcwd()+"/temp/gurobi/"+suffix+"-"
         self.edges = list(graph.edges())
         self.nodes = list(graph.nodes())
         self.tindex = [i for i,n in enumerate(self.nodes) if n in tnodes]
@@ -206,7 +210,7 @@ class MILP_primary:
         self.__connectivity()
         self.__limit_feeder(M=feeder)
         self.__objective()
-        self.model.write("primary.lp")
+        self.model.write(self.tmp+"primary.lp")
         self.solve()
         return
         
@@ -306,7 +310,7 @@ class MILP_primary:
         grb.setParam('Heuristics', 1)
         
         # Open log file
-        logfile = open('gurobi.log', 'w')
+        logfile = open(self.tmp+'gurobi.log', 'w')
         
         # Pass data into my callback function
         self.model._lastiter = -grb.GRB.INFINITY
