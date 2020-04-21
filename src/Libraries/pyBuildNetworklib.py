@@ -556,6 +556,9 @@ class Primary:
     
     def __get_partitions(self,graph_list):
         """
+        This function handles primary network creation for large number of nodes.
+        It divides the network into multiple partitions of small networks and solves
+        the optimization problem for each sub-network.
         """
         if type(graph_list) == nx.Graph: graph_list = [graph_list]
         for g in graph_list:
@@ -604,6 +607,33 @@ class Primary:
         
         # Add the first edge between substation and nearest road node
         hvlines = [(self.subdata.id,r) for r in roots]
+        
+        # Create the network with data as attributes
+        self.create_network(primary,secondary,hvlines)
+        return
+    
+    def get_stochastic_network(self,sec_file,eprob):
+        """
+        """
+        # Optimizaton problem to get the primary network
+        unif = np.random.uniform(size=len(eprob))
+        primary =  [e for i,e in enumerate(list(eprob.keys())) if unif[i]<=eprob[e]]
+        
+        # Get the associated secondary distribution network
+        nlabel = nx.get_node_attributes(self.graph,'label')
+        ncord = nx.get_node_attributes(self.graph,'cord')
+        tnodes = [n for n in list(self.graph.nodes()) if nlabel[n]=='T']
+        secondary = self.get_secondary(sec_file,tnodes)
+        rcord = {n:ncord[n] for n in list(self.graph.nodes()) if n not in tnodes}
+        
+        # Add the first edge between substation and nearest road node
+        prim_net = nx.Graph()
+        prim_net.add_edges_from(primary)
+        hvlines = []
+        for nlist in list(nx.connected_components(prim_net)):
+            rnodes = [n for n in list(nlist) if n not in tnodes]
+            rdist = [MeasureDistance(self.subdata.cord,rcord[r]) for r in rnodes]
+            hvlines.append((self.subdata.id,rnodes[np.argmin(rdist)]))
         
         # Create the network with data as attributes
         self.create_network(primary,secondary,hvlines)
