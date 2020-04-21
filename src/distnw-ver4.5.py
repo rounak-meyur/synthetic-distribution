@@ -8,6 +8,7 @@ the power flow Jacobian and its eigen values
 """
 
 import sys,os
+import numpy as np
 workPath = os.getcwd()
 inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
