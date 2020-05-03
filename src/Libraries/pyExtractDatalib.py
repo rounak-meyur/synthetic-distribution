@@ -18,7 +18,6 @@ import cx_Oracle
 import pickle
 import numpy as np
 import pandas as pd
-import geopandas as gpd
 import networkx as nx
 from collections import namedtuple as nt
 
@@ -309,13 +308,14 @@ class Query:
         return
     
     
-    def GetRoads(self,level=[1,2,3,4,5],thresh=10):
+    def GetRoads(self,fis=121,level=[1,2,3,4,5],thresh=10):
         '''
         Method to create a named tuple to store the road network data.
         '''
-        df_all = pd.read_csv(self.csvpath+'road-graph.csv')
+        fiscode = '%03.f'%(fis)
+        df_all = pd.read_csv(self.csvpath+fiscode+'-road-graph.csv')
         df_road = df_all.loc[df_all['level'].isin(level)]
-        df_cord = pd.read_csv(self.csvpath+'road-cord.csv')
+        df_cord = pd.read_csv(self.csvpath+fiscode+'-road-cord.csv')
         
         # Networkx graph construction
         root = nx.from_pandas_edgelist(df_road,'source','target','level')
@@ -328,53 +328,45 @@ class Query:
         return road(graph=graph,cord=cords)
     
     
-    def GetSubstations(self):
+    def GetSubstations(self,fis=121):
         '''
         Method to create a named tuple to store the substation location data which 
         is obtained from EIA database.
         '''
-        df_cord = pd.read_csv(self.csvpath+'subs-cord.csv')
+        fiscode = '%03.f'%(fis)
+        df_cord = pd.read_csv(self.csvpath+fiscode+'-subs-cord.csv')
         cords = df_cord.set_index('node').T.to_dict('list')
         subs = nt("substation",field_names=["cord"])
         return subs(cord=cords)
     
     
-    def GetHourlyDemand(self,inppath,filename,cordfile):
+    def GetHourlyDemand(self,inppath,filename,fis=121):
         '''
         '''
-        df_load = pd.read_csv(inppath+filename)
-        df_cord = pd.read_csv(inppath+cordfile,
-                                usecols=['HID','Longitude','Latitude'])
-        df_cord = df_cord[['HID','Longitude','Latitude']]
-        df_cord.to_csv(self.csvpath+'home-cord.csv',index=False)
-        df_demand = pd.read_csv(inppath+cordfile,usecols=['HID'])
-        #df_base = (df_load['hotWaterWH'] + df_load['standbyWH'])/24.0
-        df_base = (df_load['standbyWH'])/24.0
+        fiscode = '%03.f'%(fis)
+        df_all = pd.read_csv(inppath+filename)
+        df_home = df_all[['hid','longitude','latitude']]
         for i in range(1,25):
-            df_demand['hour'+str(i)] = df_load['P'+str(i)]+df_load['A'+str(i)]+df_base
-        df_demand.to_csv(self.csvpath+'home-load.csv',index=False)
+            df_home['hour'+str(i)] = df_all['P'+str(i)]+df_all['A'+str(i)]
+        df_home.to_csv(self.csvpath+fiscode+'-home-load.csv',index=False)
         return
     
     
-    def GetHomes(self):
+    def GetHomes(self,fis=121):
         '''
         '''
-        df_home = pd.merge(pd.read_csv(self.csvpath+'home-cord.csv'),
-                           pd.read_csv(self.csvpath+'home-load.csv'),on='HID')
-        df_home['peak'] = pd.Series(np.max(df_home.iloc[:,3:].values,axis=1))
-        df_home['average'] = pd.Series(np.mean(df_home.iloc[:,3:].values,axis=1))
+        fiscode = '%03.f'%(fis)
+        df_home = pd.read_csv(self.csvpath+fiscode+'-home-load.csv')
+        df_home['average'] = pd.Series(np.mean(df_home.iloc[:,3:27].values,axis=1))
+        df_home['peak'] = pd.Series(np.max(df_home.iloc[:,3:27].values,axis=1))
         
         home = nt("home",field_names=["cord","profile","peak","average"])
-        dict_cord = pd.read_csv(self.csvpath+'home-cord.csv').set_index('HID').T.to_dict('list')
-        dict_load = pd.read_csv(self.csvpath+'home-load.csv').set_index('HID').T.to_dict('list')
-        dict_peak = dict(zip(df_home.HID,df_home.peak))
-        dict_avg = dict(zip(df_home.HID,df_home.average))
+        dict_load = df_home.iloc[:,[0]+list(range(3,27))].set_index('hid').T.to_dict('list')
+        dict_cord = df_home.iloc[:,0:3].set_index('hid').T.to_dict('list')
+        dict_peak = dict(zip(df_home.hid,df_home.peak))
+        dict_avg = dict(zip(df_home.hid,df_home.average))
         homes = home(cord=dict_cord,profile=dict_load,peak=dict_peak,average=dict_avg)
-        
-        gdf_home = gpd.GeoDataFrame(df_home.loc[:,['HID','Longitude','Latitude','peak','average']],
-                                    geometry=gpd.points_from_xy(df_home.Longitude,
-                                                                df_home.Latitude))
-        return gdf_home,homes
+        return homes
     
     
     def GetTransformers(self):
@@ -387,7 +379,59 @@ class Query:
         df_tsfr_edges = pd.read_csv(self.csvpath+'tsfr-net.csv')
         g = nx.from_pandas_edgelist(df_tsfr_edges)
         return tsfr(cord=dict_cord,load=dict_load,graph=g)
+    
+    
+    def GetDataset(self,fislist=[121]):
+        """
+        """
+        home = nt("home",field_names=["cord","profile","peak","average"])
+        road = nt("road",field_names=["graph","cord"])
+        dict_cord={}; dict_profile={}; dict_peak={}; dict_avg={}
+        G = nx.Graph(); cords={}
         
+        for fis in fislist:
+            homes_fis = self.GetHomes(fis=fis)
+            roads_fis = self.GetRoads(fis=fis)
+            dict_cord.update(homes_fis.cord); dict_profile.update(homes_fis.profile)
+            dict_peak.update(homes_fis.peak); dict_avg.update(homes_fis.average)
+            G = nx.compose(G,roads_fis.graph); cords.update(roads_fis.cord)
+        
+        homes = home(cord=dict_cord,profile=dict_profile,
+                     peak=dict_peak,average=dict_avg)
+        roads = road(graph=G,cord=cords)
+        return homes,roads
+        
+
+
+
+#%% Functions for converting data from Rivanna
+def roads(inputpath,csvpath,place,fiscode):
+    """
+    """
+    fis = '%03.f'%(fiscode)
+    # Core link file update
+    f = open(inputpath+"nrv/core-link-file-"+place+".txt")
+    head = 'source,target,level\n'
+    data = head + '\n'.join([','.join([d for d in temp.strip('\n').split('\t')]) \
+                      for temp in f.readlines()[1:]])
+    f.close()
+    
+    f = open(csvpath+str(fis)+"-road-graph.csv",'w')
+    f.write(data)
+    f.close()
+    
+    # Geometry update
+    f = open(inputpath+"nrv/node-geometry-"+place+".txt")
+    head = 'node,longitude,latitude\n'
+    data = head +'\n'.join([','.join([d for d in temp.strip('\n').split('\t')]) \
+                      for temp in f.readlines()[1:]])
+    f.close()
+    
+    f = open(csvpath+str(fis)+"-road-cord.csv",'w')
+    f.write(data)
+    f.close()
+    return
+
 
 
 

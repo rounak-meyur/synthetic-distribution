@@ -64,10 +64,11 @@ class MapLink:
         return
     
     
-    def map_point(self,points,path=os.getcwd(),name=None,
+    def map_point(self,points,path=os.getcwd(),fiscode=121,
                   radius=0.01,projection=False):
         '''
         '''
+        fis = '%03.f'%(fiscode)
         Map2Link = {}
         if projection: Proj = {}
         for h in points.cord:
@@ -98,12 +99,12 @@ class MapLink:
         # Save as a csv file
         df_map = pd.DataFrame.from_dict(Map2Link,orient='index',
                                         columns=['source','target'])
-        df_map.index.names = [name[0].upper()+'ID']
+        df_map.index.names = ['hid']
         if projection:
             df_proj = pd.DataFrame.from_dict(Proj,orient='index',
                                          columns=['longitude','latitude'])
-            df_proj.index.names = [name[0].upper()+'ID']
-            df_map = pd.merge(df_map,df_proj,on=name[0].upper()+'ID')
-        df_map.to_csv(path+name+'2link.csv')
+            df_proj.index.names = ['hid']
+            df_map = pd.merge(df_map,df_proj,on='hid')
+        df_map.to_csv(path+fis+'-home2link.csv')
         return
     

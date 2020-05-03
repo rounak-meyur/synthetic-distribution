@@ -8,6 +8,12 @@ Physical inter-dependencies between networked civil infrastructures such as tran
 	
 **Residences** The set of residential buildings with geographical coordinates $\mathsf{H}=\{h_1,h_2,\cdots,h_N\}$, where the area consists of $N$ home locations. Each residential building can be represented by a point in the 2-D space as $\mathbf{p_h}\in\mathbb{R}^2$.
 
+Accounting for multiple corporate limits in the same county is another important aspect of data collection. For example, in case of the Roanoke county in south-west Virginia, the residential and road network information are divided into Roanoke county, Roanoke City and Salem City. This is shown in the following figure, where each of the data are extracted and combined to analyze the Roanoke county completely.
+Dataset 1| Dataset 2 | Dataset 3
+:---: | :---: | :---:
+![png](src/figs/161-roads-homes.png) | ![png](src/figs/161-770-roads-homes.png) | ![png](src/figs/161-770-775-roads-homes.png)
+
+
 ## Map points in region to network links
 This is accomplished using a QD-Tree approach. The primary aim is to reduce the computation time of the entire process. We provide an example to show how the algorithm works. We consider a single residential coordinate and a subset of road links as input data for our example. Our goal is to evaluate the nearest link to this point. We perform the task in four steps which are showed in the following figure.
 1. Plot all the road links and the residential point of interest.

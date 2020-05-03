@@ -28,14 +28,78 @@ from pyExtractDatalib import Query
 from pyMapElementslib import MapLink
 from pyBuildNetworklib import InvertMap as imap
 
+def display_data(ax,roads,homes,showhome=True,colors=['blue','green']):
+    """
+    Displays the road network and residences in the given region.
+    Parameters
+    ----------
+    fig   : TYPE: matplotlib axis object
+        DESCRIPTION.
+    roads : TYPE: named tuple with road network data
+        DESCRIPTION.
+    homes : TYPE: named tuple with residential data
+        DESCRIPTION.
+    showhome : TYPE: boolean, optional
+        DESCRIPTION. The default is True. Show/not show residences in the figure
+
+    Returns
+    -------
+    None.
+    """
+    nx.draw_networkx(roads.graph,node_size=1.0,color=colors[0],with_labels=False,
+                     ax=ax,pos=roads.cord,edge_color=colors[0])
+    hpts = list(homes.cord.values())
+    xpts = [h[0] for h in hpts]
+    ypts = [h[1] for h in hpts]
+    ax.scatter(xpts,ypts,c=colors[1],s=0.5)
+    return ax
+
+
 #%% Initialization of data sets and mappings
 q_object = Query(csvPath)
-gdf_home,homes = q_object.GetHomes()
-roads = q_object.GetRoads(level=[1,2,3,4,5])
-subs = q_object.GetSubstations()
-# MapLink(roads).map_point(homes,path=csvPath,name='home')
+# q_object.GetHourlyDemand(inpPath,"cured-51775.csv")
+homes,roads = q_object.GetDataset(fislist=[161])
+
+MapLink(roads).map_point(homes,path=csvPath,fiscode=161)
 
 print("DONE")
+sys.exit(0)
+
+#%% Plot of road network and residences
+# Plot the road network and residences for verification
+fig = plt.figure(figsize=(20,20))
+ax = fig.add_subplot(111)
+
+cols = ['royalblue','lightgreen']
+homes,roads = q_object.GetDataset(fislist=[161])
+ax = display_data(ax,roads,homes,colors=cols)
+leglines = [Line2D([0], [0], color=cols[0], markerfacecolor=cols[0], marker='o',
+                   markersize=15,linestyle='solid'),
+                Line2D([0], [0], color='white', markerfacecolor=cols[1], marker='o',
+                       markersize=15)]
+leglabels = ['road links: Roanoke county','residences: Roanoke county']
+
+cols = ['black','yellow']
+homes,roads = q_object.GetDataset(fislist=[770])
+ax = display_data(ax,roads,homes,colors=cols)
+leglines = leglines + [Line2D([0], [0], color=cols[0], markerfacecolor=cols[0], marker='o',
+                    markersize=15,linestyle='solid'),
+                Line2D([0], [0], color='white', markerfacecolor=cols[1], marker='o',
+                        markersize=15)]
+leglabels = leglabels + ['road links: Roanoke city','residences: Roanoke city']
+
+cols = ['crimson','cyan']
+homes,roads = q_object.GetDataset(fislist=[775])
+ax = display_data(ax,roads,homes,colors=cols)
+leglines = leglines + [Line2D([0], [0], color=cols[0], markerfacecolor=cols[0], marker='o',
+                    markersize=15,linestyle='solid'),
+                Line2D([0], [0], color='white', markerfacecolor=cols[1], marker='o',
+                        markersize=15)]
+leglabels = leglabels + ['road links: Salem city','residences: Salem city']
+
+ax.tick_params(axis='both',left=False,bottom=False,labelleft=False,labelbottom=False)
+ax.legend(leglines,leglabels,loc='best',ncol=1,prop={'size': 15})
+
 
 #%% Check the output
 h = 511210211001462
@@ -67,8 +131,10 @@ ax1.tick_params(axis='both',left=False,bottom=False,labelleft=False,labelbottom=
 ax1.set_title("Get all road links and point of interest",fontsize=font)
 # ax1.set_xlabel("Longitude",fontsize=font)
 # ax1.set_ylabel("Latitude",fontsize=font)
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',markersize=mark,linestyle='dashed'),
-                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',markersize=mark)]
+leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',
+                   markersize=mark,linestyle='dashed'),
+                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',
+                       markersize=mark)]
 ax1.legend(leglines,['road links','residential building'],
           loc='best',ncol=1,prop={'size': mark})
 fig1.savefig("{}{}.png".format(figPath,'step0'),bbox_inches='tight')
@@ -111,10 +177,13 @@ ax2.set_title("Step 1: Draw bounding boxes around each link and the point",fonts
 # ax2.set_xlabel("Longitude",fontsize=font)
 # ax2.set_ylabel("Latitude",fontsize=font)
 
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',markersize=mark,linestyle='dashed'),
-                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',markersize=mark),
+leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',
+                   markersize=mark,linestyle='dashed'),
+                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',
+                       markersize=mark),
            Patch(edgecolor='blue',fill=False),Patch(edgecolor='red',fill=False)]
-ax2.legend(leglines,['road links','residential building','bounding box for links', 'bounding box for residence'],
+ax2.legend(leglines,['road links','residential building','bounding box for links', 
+                     'bounding box for residence'],
           loc='best',ncol=2,prop={'size': mark})
 fig2.savefig("{}{}.png".format(figPath,'step1'),bbox_inches='tight')
 
@@ -157,10 +226,13 @@ ax3.set_title("Step 2: Short-list links with intersecting bounding box",fontsize
 # ax3.set_xlabel("Longitude",fontsize=font)
 # ax3.set_ylabel("Latitude",fontsize=font)
 
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',markersize=mark,linestyle='dashed'),
-                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',markersize=mark),
+leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',
+                   markersize=mark,linestyle='dashed'),
+                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',
+                       markersize=mark),
            Patch(edgecolor='green',fill=False),Patch(edgecolor='red',fill=False)]
-ax3.legend(leglines,['road links','residential building','bounding box for nearby links', 'bounding box for residence'],
+ax3.legend(leglines,['road links','residential building','bounding box for nearby links', 
+                     'bounding box for residence'],
           loc='best',ncol=2,prop={'size': mark})
 fig3.savefig("{}{}.png".format(figPath,'step2'),bbox_inches='tight')
 
@@ -188,9 +260,12 @@ ax4.set_title("Step 3: Find the nearest among short-listed links",fontsize=font)
 # ax4.set_xlabel("Longitude",fontsize=font)
 # ax4.set_ylabel("Latitude",fontsize=font)
 
-leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',markersize=mark,linestyle='dashed'),
-                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',markersize=mark),
-           Line2D([0], [0], color='magenta', markerfacecolor='blue', marker='o',markersize=0)]
+leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',
+                   markersize=mark,linestyle='dashed'),
+                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',
+                       markersize=mark),
+           Line2D([0], [0], color='magenta', markerfacecolor='blue', marker='o',
+                  markersize=0)]
 ax4.legend(leglines,['road links','residential building','nearest road links'],
           loc='best',ncol=1,prop={'size': mark})
 fig4.savefig("{}{}.png".format(figPath,'step3'),bbox_inches='tight')
