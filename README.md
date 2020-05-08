@@ -41,7 +41,12 @@ Mapped Residences | Local Transformers | Secondary Network
 :---: | :---: | :---:
 ![png](src/figs/secnet-org.png) | ![png](src/figs/secnet-base.png) | ![png](src/figs/secnet-out.png)
 
-### Example 2: Curved road link
+### Example 2: Straight road link
+Mapped Residences | Local Transformers | Secondary Network
+:---: | :---: | :---:
+![png](src/figs/secnet-side2.png) | ![png](src/figs/secnet-tsfr2.png) | ![png](src/figs/secnet-result2.png)
+
+### Example 3: Curved road link
 Mapped Residences | Local Transformers | Secondary Network
 :---: | :---: | :---:
 ![png](src/figs/secnet-side.png) | ![png](src/figs/secnet-tsfr.png) | ![png](src/figs/secnet-result.png)

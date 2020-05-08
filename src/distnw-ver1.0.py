@@ -29,6 +29,7 @@ inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
 csvPath = workPath + "/csv/"
 figPath = workPath + "/figs/"
+tmpPath = workPath + "/temp/"
 
 sys.path.append(libPath)
 from pyExtractDatalib import Query
@@ -157,7 +158,7 @@ L2Home = spider_obj.link_to_home
 # sys.exit(0)
 
 #%% Display summary of progress for secondary distribution network creation
-showlinks = [l for l in L2Home if len(L2Home[l])>200]
+showlinks = [l for l in L2Home if 100>=len(L2Home[l])>80]
 homelist = []
 for link in showlinks: homelist.extend(L2Home[link])
 
@@ -365,6 +366,7 @@ def display_secondary(forest,roots,link,roads):
     fig.savefig("{}{}.png".format(figPath,'secnet-result'),bbox_inches='tight')
     return
 
+link = (171531714, 222007934)
 forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,followroad=True,
                                                     heuristic=None)
 display_secondary(forest,roots,link,roads)
