@@ -33,15 +33,15 @@ class MapLink:
     The algorithm uses a QD-Tree approach to evaluate a bounding box for each
     point and link then finds the nearest link to each point.
     """
-    def __init__(self,links,radius=0.01):
+    def __init__(self,road,radius=0.01):
         '''
         '''
-        xmin,ymin = np.min(np.array(list(links.cord.values())),axis=0)
-        xmax,ymax = np.max(np.array(list(links.cord.values())),axis=0)
+        xmin,ymin = np.min(np.array(list(road.cord.values())),axis=0)
+        xmax,ymax = np.max(np.array(list(road.cord.values())),axis=0)
         bbox = (xmin,ymin,xmax,ymax)
     
         # keep track of lines so we can recover them later
-        all_link = list(links.graph.edges())
+        all_link = list(road.graph.edges())
         self.lines = []
     
         # initialize the quadtree index
@@ -50,7 +50,8 @@ class MapLink:
         # add edge bounding boxes to the index
         for i, path in enumerate(all_link):
             # create line geometry
-            line = LineString([links.cord[path[0]],links.cord[path[1]]])
+            line = road.links[path]['geometry'] if path in road.links \
+                else road.links[(path[1],path[0])]['geometry']
         
             # bounding boxes, with padding
             x1, y1, x2, y2 = line.bounds
@@ -92,6 +93,7 @@ class MapLink:
         
         # Delete unmapped points
         unmapped = [p for p in Map2Link if Map2Link[p]==None]
+        # print(unmapped)
         for p in unmapped:
             del Map2Link[p]
             #if projection: del Proj[h]

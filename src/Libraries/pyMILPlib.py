@@ -11,6 +11,7 @@ import sys,os
 import networkx as nx
 import gurobipy as grb
 import numpy as np
+import datetime
 
 #%% Function for callback
 def mycallback(model, where):
@@ -33,6 +34,18 @@ def mycallback(model, where):
             model.terminate()
         elif(time>600 and abs(objbst - objbnd) < 0.1 * (1.0 + abs(objbst))):
             print('Stop early - 10.0% gap achieved time exceeds 10 minutes')
+            model.terminate()
+        elif(time>1500 and abs(objbst - objbnd) < 0.15 * (1.0 + abs(objbst))):
+            print('Stop early - 15.0% gap achieved time exceeds 25 minutes')
+            model.terminate()
+        elif(time>3000 and abs(objbst - objbnd) < 0.2 * (1.0 + abs(objbst))):
+            print('Stop early - 20.0% gap achieved time exceeds 50 minutes')
+            model.terminate()
+        elif(time>6000 and abs(objbst - objbnd) < 0.3 * (1.0 + abs(objbst))):
+            print('Stop early - 30.0% gap achieved time exceeds 100 minutes')
+            model.terminate()
+        elif(time>12000 and abs(objbst - objbnd) < 0.4 * (1.0 + abs(objbst))):
+            print('Stop early - 40.0% gap achieved time exceeds 200 minutes')
             model.terminate()
     return
 
@@ -61,7 +74,6 @@ class MILP_secondary:
         self.c = np.array([1e-3*COST[e] for e in self.edges])
         self.l = np.array([1e-3*LENGTH[e] for e in self.edges])
         self.p = np.array([1e-3*LOAD[self.nodes[i]] for i in self.hindex])
-        print(self.p)
         self.model = grb.Model(name="Get Spiders")
         self.model.ModelSense = grb.GRB.MINIMIZE
         self.__variables()
@@ -86,9 +98,9 @@ class MILP_secondary:
         self.z = self.model.addMVar(len(self.edges),
                                     vtype=grb.GRB.CONTINUOUS,
                                     lb=-grb.GRB.INFINITY,name='z')
-        self.v = self.model.addMVar(len(self.nodes),
-                                    vtype=grb.GRB.CONTINUOUS,
-                                    lb=0.95,ub=1.00,name='v')
+        # self.v = self.model.addMVar(len(self.nodes),
+        #                             vtype=grb.GRB.CONTINUOUS,
+        #                             lb=0.95,ub=1.00,name='v')
         self.model.update()
         return
     
@@ -124,11 +136,11 @@ class MILP_secondary:
         self.model.addConstr(self.A[self.hindex,:]@self.f == -self.p,name='balance')
         self.model.addConstr(self.f - M*self.x <= 0,name="flow_a")
         self.model.addConstr(self.f + M*self.x >= 0,name="flow_b")
-        expr = r*np.diag(self.l)@self.f
-        self.model.addConstr(self.A.T@self.v - expr - 0.1*(1-self.x) <= 0,name='va')
-        self.model.addConstr(self.A.T@self.v - expr + 0.1*(1-self.x) >= 0,name='vb')
-        for i in self.tindex:
-            self.model.addConstr(self.v[i]==1,name="voltage")
+        # expr = r*np.diag(self.l)@self.f
+        # self.model.addConstr(self.A.T@self.v - expr - 0.1*(1-self.x) <= 0,name='va')
+        # self.model.addConstr(self.A.T@self.v - expr + 0.1*(1-self.x) >= 0,name='vb')
+        # for i in self.tindex:
+        #     self.model.addConstr(self.v[i]==1,name="voltage")
         self.model.update()
         return
     

@@ -19,6 +19,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import networkx as nx
+from shapely.geometry import LineString
 from collections import namedtuple as nt
 
 
@@ -294,38 +295,148 @@ def get_files_from_db(homeact_out_fname, subpos_out_fname):
     # Close connection with database
     conn.close()
 
+#%% Functions
+from geographiclib.geodesic import Geodesic
+from pyqtree import Index
+from shapely.geometry import Point
 
+def MeasureDistance(pt1,pt2):
+    '''
+    The format of each point is (longitude,latitude).
+    '''
+    lon1,lat1 = pt1
+    lon2,lat2 = pt2
+    geod = Geodesic.WGS84
+    return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
+
+def combine_components(graph,cords,radius = 0.01):
+    """
+    
+
+    Parameters
+    ----------
+    graph : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    # Initialize QD Tree
+    xmin,ymin = np.min(np.array(list(cords.values())),axis=0)
+    xmax,ymax = np.max(np.array(list(cords.values())),axis=0)
+    bbox = (xmin,ymin,xmax,ymax)
+    idx = Index(bbox)
+    
+    # Differentiate large and small components
+    comps = [c for c in list(nx.connected_components(graph))]
+    lencomps = [len(c) for c in list(nx.connected_components(graph))]
+    indlarge = lencomps.index(max(lencomps))
+    node_main = list(graph.subgraph(comps[indlarge]).nodes())
+    del(comps[indlarge])
+    
+    # keep track of lines so we can recover them later
+    nodes = []
+    
+    # create bounding box around each point in large component
+    for i,node in enumerate(node_main):
+        pt = Point(cords[node])
+        pt_bounds = pt.x-radius, pt.y-radius, pt.x+radius, pt.y+radius
+        idx.insert(i, pt_bounds)
+        nodes.append((pt, pt_bounds, node))
+        
+    # find intersection and add edges
+    edgelist = []
+    for c in comps:
+        node_comp = list(graph.subgraph(c).nodes())
+        nodepairs = []
+        for n in node_comp:
+            pt = Point(cords[n])
+            pt_bounds = pt.x-radius, pt.y-radius, pt.x+radius, pt.y+radius
+            matches = idx.intersect(pt_bounds)
+            closest_pt = min(matches,key=lambda i: nodes[i][0].distance(pt))
+            nodepairs.append((n,nodes[closest_pt][-1]))
+        dist = [MeasureDistance(cords[p[0]],cords[p[1]]) for p in nodepairs]
+        edgelist.append(nodepairs[np.argmin(dist)])
+    return edgelist
 
 #%% Classes
 
 class Query:
     """
     """
-    def __init__(self,csvpath):
+    def __init__(self,csvpath,inppath):
         '''
         '''
+        self.inppath = inppath
         self.csvpath = csvpath
+        self.area = self.__getareacode()
         return
     
+    def __getareacode(self):
+        """
+        """
+        dictarea = {}
+        with open(self.inppath+"areacode.txt") as file:
+            for temp in file.readlines():
+                data = temp.strip('\n').split('\t')
+                dictarea[data[0]] = data[1]
+        return dictarea
     
-    def GetRoads(self,fis=121,level=[1,2,3,4,5],thresh=10):
-        '''
-        Method to create a named tuple to store the road network data.
-        '''
+    def GetRoads(self,fis=121,level=[1,2,3,4,5],thresh=0):
+        """
+        """
         fiscode = '%03.f'%(fis)
-        df_all = pd.read_csv(self.csvpath+fiscode+'-road-graph.csv')
-        df_road = df_all.loc[df_all['level'].isin(level)]
-        df_cord = pd.read_csv(self.csvpath+fiscode+'-road-cord.csv')
+        place = self.area[fiscode]
+        corefile = "nrv/core-link-file-" + place + ".txt"
+        linkgeom = "nrv/link-file-" + place + ".txt"
+        nodegeom = "nrv/node-geometry-" + place + ".txt"
         
-        # Networkx graph construction
-        root = nx.from_pandas_edgelist(df_road,'source','target','level')
-        comps = [c for c in list(nx.connected_components(root)) if len(c)>thresh]
-        graph = nx.Graph()
-        for c in comps: graph=nx.compose(graph,root.subgraph(c))
+        datalink = {}
+        roadcord = {}
+        edgelist = []
         
-        cords = df_cord.set_index('node').T.to_dict('list')
-        road = nt("road",field_names=["graph","cord"])
-        return road(graph=graph,cord=cords)
+        # Get edgelist from the core link file
+        with open(self.inppath+corefile) as file:
+            for temp in file.readlines()[1:]:
+                edge = tuple([int(x) for x in temp.strip("\n").split("\t")[0:2]])
+                lvl = int(temp.strip("\n").split("\t")[-1])
+                if (edge not in edgelist) and ((edge[1],edge[0]) not in edgelist):
+                    edgelist.append(edge)
+                    datalink[edge] = {'level':lvl,'geometry':None}
+        # Get node coordinates from the node geometry file            
+        with open(self.inppath+nodegeom) as file:
+            for temp in file.readlines()[1:]:
+                data = temp.strip('\n').split('\t')
+                roadcord[int(data[0])]=[float(data[1]),float(data[2])]
+        
+        # Get link geometry from the link geometry file
+        with open(self.inppath+linkgeom) as file:
+            for temp in file.readlines()[1:]:
+                data = temp.strip("\n").split("\t")
+                edge = tuple([int(x) for x in data[3:5]])
+                pts = [tuple([float(x) for x in pt.split(' ')]) \
+                        for pt in data[10].lstrip('MULTILINESTRING((').rstrip('))').split(',')]
+                geom = LineString(pts)
+                if (edge in edgelist):
+                    datalink[edge]['geometry']=geom
+                elif ((edge[1],edge[0]) in edgelist):
+                    datalink[(edge[1],edge[0])]['geometry']=geom
+                else:
+                    print(','.join([str(x) for x in list(edge)])+": not in edgelist")
+        # Update the link dictionary with missing geometries    
+        for edge in datalink:
+            if datalink[edge]['geometry']==None:
+                pts = [tuple(roadcord[r]) for r in list(edge)]
+                geom = LineString(pts)
+                datalink[edge]['geometry'] = geom
+                
+        # Create networkx graph from edges in the level list
+        listedge = [edge for edge in edgelist if datalink[edge]['level'] in level]
+        graph = nx.Graph(listedge)
+        road = nt("road",field_names=["graph","cord","links"])
+        return road(graph=graph,cord=roadcord,links=datalink)
     
     
     def GetSubstations(self,fis=121):
@@ -385,9 +496,9 @@ class Query:
         """
         """
         home = nt("home",field_names=["cord","profile","peak","average"])
-        road = nt("road",field_names=["graph","cord"])
+        road = nt("road",field_names=["graph","cord","links"])
         dict_cord={}; dict_profile={}; dict_peak={}; dict_avg={}
-        G = nx.Graph(); cords={}
+        G = nx.Graph(); cords={};datalink={}
         
         for fis in fislist:
             homes_fis = self.GetHomes(fis=fis)
@@ -395,42 +506,22 @@ class Query:
             dict_cord.update(homes_fis.cord); dict_profile.update(homes_fis.profile)
             dict_peak.update(homes_fis.peak); dict_avg.update(homes_fis.average)
             G = nx.compose(G,roads_fis.graph); cords.update(roads_fis.cord)
+            datalink.update(roads_fis.links)
+        
+        # Form the single network graph
+        new_edges = combine_components(G,cords)
+        G.add_edges_from(new_edges)
+        datalink.update({edge:{'level':5,'geometry':LineString([tuple(cords[r]) \
+                          for r in list(edge)])} for edge in new_edges})
         
         homes = home(cord=dict_cord,profile=dict_profile,
                      peak=dict_peak,average=dict_avg)
-        roads = road(graph=G,cord=cords)
+        roads = road(graph=G,cord=cords,links=datalink)
         return homes,roads
         
 
 
 
-#%% Functions for converting data from Rivanna
-def roads(inputpath,csvpath,place,fiscode):
-    """
-    """
-    fis = '%03.f'%(fiscode)
-    # Core link file update
-    f = open(inputpath+"nrv/core-link-file-"+place+".txt")
-    head = 'source,target,level\n'
-    data = head + '\n'.join([','.join([d for d in temp.strip('\n').split('\t')]) \
-                      for temp in f.readlines()[1:]])
-    f.close()
-    
-    f = open(csvpath+str(fis)+"-road-graph.csv",'w')
-    f.write(data)
-    f.close()
-    
-    # Geometry update
-    f = open(inputpath+"nrv/node-geometry-"+place+".txt")
-    head = 'node,longitude,latitude\n'
-    data = head +'\n'.join([','.join([d for d in temp.strip('\n').split('\t')]) \
-                      for temp in f.readlines()[1:]])
-    f.close()
-    
-    f = open(csvpath+str(fis)+"-road-cord.csv",'w')
-    f.write(data)
-    f.close()
-    return
 
 
 

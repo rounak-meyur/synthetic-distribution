@@ -26,9 +26,9 @@ tmpPath = workPath + "/temp/"
 sys.path.append(libPath)
 from pyExtractDatalib import Query
 from pyMapElementslib import MapLink
-from pyBuildNetworklib import InvertMap as imap
+# from pyBuildNetworklib import InvertMap as imap
 
-def display_data(ax,roads,homes,showhome=True,colors=['blue','green']):
+def display_data(ax,roads,homes,colors=['blue','green'],showhome=False):
     """
     Displays the road network and residences in the given region.
     Parameters
@@ -39,26 +39,32 @@ def display_data(ax,roads,homes,showhome=True,colors=['blue','green']):
         DESCRIPTION.
     homes : TYPE: named tuple with residential data
         DESCRIPTION.
-    showhome : TYPE: boolean, optional
-        DESCRIPTION. The default is True. Show/not show residences in the figure
 
     Returns
     -------
     None.
     """
-    nx.draw_networkx(roads.graph,node_size=1.0,color=colors[0],with_labels=False,
-                     ax=ax,pos=roads.cord,edge_color=colors[0])
+    # edges = list(roads.graph.edges())
+    # for edge in edges:
+    #     geom = roads.links[edge]['geometry'] if edge in roads.links \
+    #         else roads.links[(edge[1],edge[0])]['geometry']
+    #     ax.plot(geom.xy[0],geom.xy[1],linestyle='dashed',color=colors[0],
+    #             linewidth=1.5)
+    nx.draw_networkx(roads.graph,node_size=0.1,color=colors[0],with_labels=False,
+                     ax=ax,pos=roads.cord,edge_color=colors[0],style="dashed",width=0.5)
     hpts = list(homes.cord.values())
     xpts = [h[0] for h in hpts]
     ypts = [h[1] for h in hpts]
-    ax.scatter(xpts,ypts,c=colors[1],s=0.5)
+    if showhome: ax.scatter(xpts,ypts,c=colors[1],s=0.5)
     return ax
 
 
 #%% Initialization of data sets and mappings
-q_object = Query(csvPath)
+q_object = Query(csvPath,inpPath)
 # q_object.GetHourlyDemand(inpPath,"cured-51775.csv")
-homes,roads = q_object.GetDataset(fislist=[161])
+homes,roads = q_object.GetDataset(fislist=[161,770,775])
+print("Total number of links:",roads.graph.number_of_edges(),
+      "\nTotal number of homes:",len(homes.cord))
 
 MapLink(roads).map_point(homes,path=csvPath,fiscode=161)
 

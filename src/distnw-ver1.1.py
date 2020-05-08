@@ -32,36 +32,41 @@ sys.path.append(libPath)
 from pyExtractDatalib import Query
 from pyBuildNetworklib import Spider
 from pyBuildNetworklib import MeasureDistance as dist
-#from pyMapElementslib import MapLink
-#MapLink(roads).map_points(homes,path=csvPath,name='home')
+
 
 #%% Initialization of data sets and mappings
-q_object = Query(csvPath)
-gdf_home,homes = q_object.GetHomes()
-roads = q_object.GetRoads()
+q_object = Query(csvPath,inpPath)
+homes,roads = q_object.GetDataset(fislist=[161,770,775])
 
-df_hmap = pd.read_csv(csvPath+'home2link.csv')
-H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
+fiscode = '%03.f'%(161)
+df_hmap = pd.read_csv(csvPath+fiscode+'-home2link.csv')
+H2Link = dict([(t.hid, (t.source, t.target)) for t in df_hmap.itertuples()])
 spider_obj = Spider(homes,roads,H2Link)
 L2Home = spider_obj.link_to_home
-links = [l for l in L2Home if 0<len(L2Home[l])<=70]
+
+links = [l for l in L2Home if 0<len(L2Home[l])]
 # sys.exit(0)
+
 #%% Create secondary network
 import time
-start_time = time.time()
-prefix = '51121'
+
+prefix = '51'+fiscode
 suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
 network = ''
-count = 100000
+count = 5035942
 dict_tsfr = {}
 edgelist = []
+dict_time = {}
+
 for link in links:
     # initialize
+    start_time = time.time()
     rename = {} # to rename the transformers with node IDs
     tsfrlist = [] # to list the transformers
     
     # Solve the optimization problem and generate forest
-    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50)
+    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,
+                                                        followroad=True,heuristic=None)
     cord = nx.get_node_attributes(forest,'cord')
     load = nx.get_node_attributes(forest,'load')
     
@@ -94,20 +99,57 @@ for link in links:
         type2 = 'T' if e[1] in roots else 'H'
         cord2a = str(cord[e[1]][0])
         cord2b = str(cord[e[1]][1])
-        network += ' '.join([node1,type1,cord1a,cord1b,
+        network += '\t'.join([node1,type1,cord1a,cord1b,
                              node2,type2,cord2a,cord2b])+'\n'
     
-end_time = time.time()
+    # Store end time
+    end_time = time.time()
+    dict_time[link]=end_time-start_time
 
-#%% Save required data
-f_network = open(tmpPath+"sec-dist"+suffix+".txt",'w')
+#%% Save required data in the temp directory
+# This is to account for the program being run at different times
+# suffix='-1'
+f_network = open(tmpPath+fiscode+"-sec-dist"+suffix+".txt",'w')
 f_network.write(network)
 f_network.close()
 df = pd.DataFrame(edgelist,columns=['source','target'])
-df.to_csv(csvPath+'tsfr-net.csv',index=False)
+df.to_csv(tmpPath+fiscode+'-tsfr-net'+suffix+'.csv',index=False)
 
 df = pd.DataFrame.from_dict(dict_tsfr,orient='index',
                             columns=['long','lat','load'])
-df.to_csv(csvPath+'tsfr-cord-load.csv')
+df.to_csv(tmpPath+fiscode+'-tsfr-data'+suffix+'.csv')
+
+f=open(tmpPath+fiscode+"-time-stat"+suffix+".txt",'w')
+times = '\n'.join(['\t'.join([str(k[0]),str(k[1]),str(dict_time[k])]) \
+                   for k in dict_time])+'\n'
+f.write(times)
+f.close()
 
 print("DONE")
+sys.exit(0)
+
+
+#%% Update saved csv/txt files with new secondary network data
+def update_file(dirname,mainfile,updatefile,header=True):
+    """
+    Updates the csv files which have headers or txt files which have no headers
+    
+    dirname: name of directory where the files are present
+    mainfile: name of main file
+    updatefile: name of the file which is to be appended
+    header: optional, default is True. If header is present or not
+    """
+    f = open(dirname+updatefile)
+    if header: data_update = f.readlines()[1:]
+    else: data_update = f.readlines()
+    f.close()
+    data = ''.join(data_update)
+    f = open(dirname+mainfile,'a')
+    f.write(data)
+    f.close()
+    return
+
+update_file(tmpPath,"161-sec-dist.txt","161-sec-dist-1.txt",header=False)
+update_file(tmpPath,"161-time-stat.txt","161-time-stat-1.txt",header=False)
+update_file(tmpPath,"161-tsfr-net.csv","161-tsfr-net-1.csv")
+update_file(tmpPath,"161-tsfr-data.csv","161-tsfr-data-1.csv")

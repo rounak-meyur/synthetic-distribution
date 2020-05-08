@@ -36,9 +36,15 @@ Once the home coordinates are mapped to the nearest road network link, the next 
 	- considering total number of edges to be equal to the number of residences which are also non-root nodes.
 The above constraints are formulated as linear constraints in a mixed integer linear programming (MILP) problem. The objective function of the problem is the total length of all edges in the network. 
 
+### Example 1: Straight road link
 Mapped Residences | Local Transformers | Secondary Network
 :---: | :---: | :---:
-![png](src/figs/secnet_org.png) | ![png](src/figs/secnet-base.png) | ![png](src/figs/secnet-out.png)
+![png](src/figs/secnet-org.png) | ![png](src/figs/secnet-base.png) | ![png](src/figs/secnet-out.png)
+
+### Example 2: Curved road link
+Mapped Residences | Local Transformers | Secondary Network
+:---: | :---: | :---:
+![png](src/figs/secnet-side.png) | ![png](src/figs/secnet-tsfr.png) | ![png](src/figs/secnet-result.png)
 
 ## Creating the primary distribution network
 The goal is to create the primary distribution network which connects the substations to the local transformers. For this purpose, we aggregate the load at residences to the local transformer locations which have been obtained as an output from the preceding step. The objective of the current step is to connect all these local transformer locations to the substation.

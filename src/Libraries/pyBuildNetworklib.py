@@ -11,7 +11,7 @@ from matplotlib import cm
 import numpy as np
 from scipy.spatial import Delaunay
 from itertools import combinations
-from shapely.geometry import LineString,MultiPoint
+from shapely.geometry import LineString,MultiPoint,LinearRing
 from pyMILPlib import MILP_secondary,MILP_primary
 from scipy.spatial import cKDTree
 import matplotlib.pyplot as plt
@@ -281,10 +281,13 @@ class Link(LineString):
             print("Cannot compute length!!!")
             return None
         # Copute great circle distance
-        lon1,lon2 = self.xy[0]
-        lat1,lat2 = self.xy[1]
         geod = Geodesic.WGS84
-        return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
+        length = 0.0
+        for i in range(len(list(self.coords))-1):
+            lon1,lon2 = self.xy[0][i:i+2]
+            lat1,lat2 = self.xy[1][i:i+2]
+            length += geod.Inverse(lat1, lon1, lat2, lon2)['s12']
+        return length
     
     
     def InterpolatePoints(self,min_sep=50):
@@ -292,7 +295,7 @@ class Link(LineString):
         """
         points = []
         length = self.geod_length
-        sep = max(min_sep,(length/15))
+        sep = max(min_sep,(length/25))
         for i in np.arange(0,length,sep):
             x,y = self.interpolate(i/length,normalized=True).xy
             xy = (x[0],y[0])
@@ -319,11 +322,12 @@ class Spider:
         self.home_load = homes.average
         self.home_cord = homes.cord
         self.road_cord = roads.cord
+        self.links = roads.links
         self.link_to_home = InvertMap(home_to_link)
         return
     
     
-    def __separate_side(self,link):
+    def separate_side(self,link):
         """
         Evaluates the groups of homes on either side of the link. This would help in 
         creating network with minimum crossover of distribution lines over the road
@@ -335,12 +339,11 @@ class Spider:
         """
         homelist = self.link_to_home[link] if link in self.link_to_home\
             else self.link_to_home[(link[1],link[0])]
-        points = [self.home_cord[h] for h in homelist]
-        (x1,y1) = self.road_cord[link[0]]
-        (x2,y2) = self.road_cord[link[1]]
-        eqn = [((x-x1)*(y2-y1))-((y-y1)*(x2-x1)) for (x,y) in points]
-        side = {home: 1 if eqn[index]>=0 else -1 for index,home in enumerate(homelist)}
-        return side
+        line = list(self.links[link]['geometry'].coords) if link in self.links \
+            else list(self.links[(link[1],link[0])]['geometry'].coords)
+        side = {h: LinearRing(line+[tuple(self.home_cord[h]),line[0]]).is_ccw \
+                for h in homelist}
+        return {h:1 if side[h]==True else -1 for h in homelist}
     
     
     def __complete_graph_from_list(self,L):
@@ -379,28 +382,41 @@ class Spider:
         G.add_edges_from(edgelist)
         return G
     
-    def get_nodes(self,link,minsep):
+    def get_nodes(self,link,minsep=50,followroad=False):
         """
         Gets all the nodes from the dummy graph created before solving the optimization 
         problem.
         
         Inputs: link: road link of interest for which the problem is solved.
                 minsep: minimum separation in meters between the transformers.
+                followroad: default is False. follows only road terminals
+                            if True it follows the exact road.
         Outputs:home_pts: list of residential points
                 transformers: list of points along link which are probable locations 
                 of transformers.
         """
         home_pts = self.link_to_home[link]
-        if len(home_pts) > 100:
-            link_line = Link(LineString([tuple(self.road_cord[n]) for n in link]))
-            transformers = link_line.InterpolatePoints(minsep)
+        if followroad:
+            link_line = Link(self.links[link]['geometry']) if link in self.links \
+                else Link(self.links[(link[1],link[0])]['geometry'])
         else:
             link_line = Link(LineString([tuple(self.road_cord[n]) for n in link]))
-            transformers = link_line.InterpolatePoints(minsep)
+        transformers = link_line.InterpolatePoints(minsep)
         return home_pts,transformers
     
+    def get_nearpts_tsfr(self,transformers,homelist,heuristic):
+        """
+        """
+        edgelist = []
+        for t in transformers:
+            distlist = [MeasureDistance(transformers[t],self.home_cord[h]) \
+                        for h in homelist]
+            imphomes = np.array(homelist)[np.argsort(distlist)[:heuristic]]
+            edgelist.extend([(t,n) for n in imphomes])
+        return edgelist
     
-    def create_dummy_graph(self,link,minsep,penalty):
+    
+    def create_dummy_graph(self,link,minsep,penalty,followroad=False,heuristic=None):
         """
         Creates the base network to carry out the optimization problem. The base graph
         may be a Delaunay graph or a full graph depending on the size of the problem.
@@ -408,18 +424,21 @@ class Spider:
         Inputs: link: road link of interest for which the problem is solved.
                 minsep: minimum separation in meters between the transformers.
                 penalty: penalty factor for crossing the link.
+                followroad: default is False. follows only road terminals
+                            if True it follows the exact road.
+                heuristic: join transformers to nearest few nodes given by heuristic.
+                        Used to create the dummy graph
         Outputs:graph: the generated base graph also called the dummy graph
                 transformers: list of points along link which are probable locations 
                 of transformers.
         """
-        sides = self.__separate_side(link)
-        home_pts = self.link_to_home[link]
+        sides = self.separate_side(link)
+        home_pts,transformers = self.get_nodes(link,minsep=minsep,
+                                               followroad=followroad)
         node_pos = {h:self.home_cord[h] for h in home_pts}
         load = {h:self.home_load[h]/1000.0 for h in home_pts}
                 
         # Update the attributes of nodes
-        link_line = Link(LineString([tuple(self.road_cord[n]) for n in link]))
-        transformers = link_line.InterpolatePoints(minsep)
         node_pos.update(transformers)
         sides.update({t:0 for t in transformers})
         load.update({t:1.0 for t in transformers})
@@ -429,7 +448,11 @@ class Spider:
             graph = self.__delaunay_graph_from_list(home_pts)
         else:
             graph = self.__complete_graph_from_list(home_pts)
-        new_edges = [(t,n) for t in transformers for n in home_pts]
+        
+        if heuristic != None:
+            new_edges = self.get_nearpts_tsfr(transformers,home_pts,heuristic)
+        else:
+            new_edges = [(t,n) for t in transformers for n in home_pts]
         graph.add_edges_from(new_edges)
         nx.set_node_attributes(graph,node_pos,'cord')
         nx.set_node_attributes(graph,load,'load')
@@ -442,18 +465,24 @@ class Spider:
         nx.set_edge_attributes(graph,edge_cost,'cost')
         return graph,transformers
     
-    def generate_optimal_topology(self,link,minsep=50,penalty=0.5,hops=4):
+    def generate_optimal_topology(self,link,minsep=50,penalty=0.5,followroad=False,
+                                  heuristic=None,hops=4):
         """
         Calls the MILP problem and solves it using gurobi solver.
         
         Inputs: link: road link of interest for which the problem is solved.
                 minsep: minimum separation in meters between the transformers.
                 penalty: penalty factor for crossing the link.
+                followroad: default is False. follows only road terminals
+                            if True it follows the exact road.
+                heuristic: join transformers to nearest few nodes given by heuristic.
+                          Used to create the dummy graph
         Outputs:forest: the generated forest graph which is the secondary network
                 roots: list of points along link which are actual locations of 
                 transformers.
         """
-        graph,roots = self.create_dummy_graph(link,minsep,penalty)
+        graph,roots = self.create_dummy_graph(link,minsep,penalty,
+                                              followroad=followroad,heuristic=heuristic)
         edgelist = MILP_secondary(graph,roots).optimal_edges
         forest = nx.Graph()
         forest.add_edges_from(edgelist)
@@ -462,7 +491,8 @@ class Spider:
                      for node in list(forest.nodes())}
         nx.set_node_attributes(forest,node_cord,'cord')
         node_load = {node:sum([self.home_load[h] for h in list(nx.descendants(forest,node))]) \
-                     if node in roots else self.home_load[node] for node in list(forest.nodes())}
+                     if node in roots else self.home_load[node] \
+                         for node in list(forest.nodes())}
         nx.set_node_attributes(forest,node_load,'load')
         return forest,roots
     
@@ -543,8 +573,8 @@ class Primary:
         f.close()
         
         # create the entire secondary network
-        secondary = [(int(temp.strip('\n').split(' ')[0]),
-                         int(temp.strip('\n').split(' ')[4])) \
+        secondary = [(int(temp.strip('\n').split('\t')[0]),
+                         int(temp.strip('\n').split('\t')[4])) \
                         for temp in lines]
         sec_net = nx.Graph()
         sec_net.add_edges_from(secondary)
