@@ -131,3 +131,13 @@ def display_data(ax,roads,homes,subs,showhome=True,showsub=True):
 fig = plt.figure(figsize=(20,20))
 ax = fig.add_subplot(111)
 ax = display_data(ax,roads,homes,subs,showhome=False)
+
+
+#%% Generate partitions in each cluster and plot it
+sub = 146410
+substation = nt("local_substation",field_names=["id","cord","nodes"])
+sub_data = substation(id=sub,cord=subs.cord[sub],nodes=S2Node[sub])
+
+P = Primary(sub_data,homes,G)
+plot_graph(P.graph,subdata=sub_data,path=figPath,filename=str(sub)+'-master',
+           rcol=color_code[1:nx.number_connected_components(P.graph)+1])

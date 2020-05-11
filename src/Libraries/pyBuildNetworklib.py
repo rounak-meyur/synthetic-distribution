@@ -521,7 +521,7 @@ class Primary:
     First the set of possible edges are identified from the links in road net-
     -work and transformer connections.
     """
-    def __init__(self,subdata,homes,master_graph,max_node=1200):
+    def __init__(self,subdata,homes,master_graph,max_node=900):
         """
         """
         self.max_node = max_node

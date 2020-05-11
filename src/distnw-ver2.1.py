@@ -54,20 +54,10 @@ sub = 146410
 substation = nt("local_substation",field_names=["id","cord","nodes"])
 sub_data = substation(id=sub,cord=subs.cord[sub],nodes=S2Node[sub])
 sys.exit(0)
+
 #%% Generate primary distribution network
-color_code = ['black','lightcoral','red','chocolate','darkorange','goldenrod',
-              'olive','chartreuse','palegreen','seagreen','springgreen',
-              'darkslategray','darkturquoise','deepskyblue','dodgerblue',
-              'cornflowerblue','midnightblue','blue','mediumslateblue',
-              'darkviolet','violet','magenta','deeppink','crimson','lightpink']
 P = Primary(sub_data,homes,graph)
-plot_graph(P.graph,subdata=sub_data,path=figPath,filename=str(sub)+'-master',
-           rcol=color_code[1:nx.number_connected_components(P.graph)+1])
-sys.exit(0)
-
-
-P = Primary(sub_data,homes,graph)
-P.get_sub_network(secondary_network_file,flowmax=400,feedermax=5)
+P.get_sub_network(secondary_network_file,flowmax=800,feedermax=10)
 dist_net = P.dist_net
 
 #%% Display network and save png
