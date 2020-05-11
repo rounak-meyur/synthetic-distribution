@@ -9,6 +9,7 @@ Physical inter-dependencies between networked civil infrastructures such as tran
 **Residences** The set of residential buildings with geographical coordinates $\mathsf{H}=\{h_1,h_2,\cdots,h_N\}$, where the area consists of $N$ home locations. Each residential building can be represented by a point in the 2-D space as $\mathbf{p_h}\in\mathbb{R}^2$.
 
 Accounting for multiple corporate limits in the same county is another important aspect of data collection. For example, in case of the Roanoke county in south-west Virginia, the residential and road network information are divided into Roanoke county, Roanoke City and Salem City. This is shown in the following figure, where each of the data are extracted and combined to analyze the Roanoke county completely.
+
 Dataset 1| Dataset 2 | Dataset 3
 :---: | :---: | :---:
 ![png](src/figs/161-roads-homes.png) | ![png](src/figs/161-770-roads-homes.png) | ![png](src/figs/161-770-775-roads-homes.png)
@@ -24,6 +25,7 @@ This is accomplished using a QD-Tree approach. The primary aim is to reduce the 
 Step 0 | Step 1 | Step 2 | Step 3
 :---: | :---: | :---: | :---:
 ![png](src/figs/step0.png) | ![png](src/figs/step1.png) | ![png](src/figs/step2.png) | ![png](src/figs/step3.png)
+
 ## Creating the secondary distribution network
 Once the home coordinates are mapped to the nearest road network link, the next objective is to create the secondary distribution network which connects the residence coordinates with points on the road link. The first step is to interpolate points along the road network link where local transformers can be placed. An usual engineering practice undertaken by most distribution companies is to place these local transformers at equal distance apart from each other along the link. Let this distance be denoted by $\mathsf{d}$. The following aspects act as constraints while creating the secondary distribution network.
 1. Each residential node has to be covered.
@@ -55,6 +57,7 @@ Mapped Residences | Local Transformers | Secondary Network
 The goal is to create the primary distribution network which connects the substations to the local transformers. For this purpose, we aggregate the load at residences to the local transformer locations which have been obtained as an output from the preceding step. The objective of the current step is to connect all these local transformer locations to the substation.
 
 One of the challenges is to handle the large size of the network. For each county, there are few tens of thousands of identified transformer locations. Therefore, the first task is to partition the transformer nodes into separate groups/clusters such that each substation serves only the transformers in a given cluster. We assume that the primary network follows the road network, the clusters should remain connected through the road network. Otherwise, we would be left with multiple disconnected components in each cluster. We use a Voronoi clustering based on the shortest network distance in the graph formed by connecting the road network nodes and transformer nodes along it. The following figure shows the Voronoi partitions for the transformer nodes identified in Roanoke county of south-west Virginia. It is evident that the nearest geographically located nodes are not partioned in the same cluster; rather, nearest nodes based on the network distance are clustered. Two such clusters are shown in the adjacent figures.
+
 Voronoi Partitioning | Partition 1 | Partition 2
 :---: | :---| | :---:
 ![png](src/figs/161-voronoi.png) | ![png](src/figs/161-voronoi-1.png) | ![png](src/figs/161-voronoi-2.png)
@@ -62,6 +65,7 @@ Voronoi Partitioning | Partition 1 | Partition 2
 The next task is to connect the transformers in individual partion/cluster. Since we assume that the primary distribution network almost follows the road network and therefore the latter may be used as a proxy network for the former. Hence, the goal of the current step is to select edges along the road network graph such that all local transformer locations along road links are covered. The road network nodes which define the road network graph can be considered to be dummy points with no load, while the transformer locations have aggregated residential load demands. The road network nodes are only required to be covered in order to connect the local transformer points. In other words, the road network nodes cannot be leaf nodes in the created primary network.
 
 Finally, a substation can have multiple feeder lines connecting different local group of residences. This is usual in a rural geographic region where such local groups are distinctly observable. Therefore, the primary network may be created as a forest of trees with the roots connected to the substation though high voltage feeder lines. The trees are rooted at some road network node and covers all the local transformers. This task is shown for a partition of Montgomery county of south-west Virginia. Here we formulate an optimization problem to identify the primary network. Thereafter, we conect it with the associated secondary to obtain the entire network.
+
 Road network | Primary Network | Entire Network
 :---: | :---: | :---:
 ![png](src/figs/24664-master.png) | ![png](src/figs/24664-primary.png) | ![png](src/figs/24664-network.png)
