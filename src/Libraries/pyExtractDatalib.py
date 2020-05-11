@@ -18,6 +18,7 @@ import cx_Oracle
 import pickle
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 import networkx as nx
 from shapely.geometry import LineString
 from collections import namedtuple as nt
@@ -439,16 +440,37 @@ class Query:
         return road(graph=graph,cord=roadcord,links=datalink)
     
     
-    def GetSubstations(self,fis=121):
-        '''
-        Method to create a named tuple to store the substation location data which 
-        is obtained from EIA database.
-        '''
+    def GetSubstations(self,fis=121,sub_file='Electric_Substations.shp',
+                        county_file='county.shp'):
+        """
+        Gets the list of substations within the county polygon
+        
+        Parameters
+        ----------
+        fis : TYPE
+            DESCRIPTION.
+        sub_file : TYPE, optional
+            DESCRIPTION. The default is 'Electric_Substations.shp'.
+        county_file : TYPE, optional
+            DESCRIPTION. The default is 'county.shp'.
+        
+        Returns
+        -------
+        None.
+        
+        """
         fiscode = '%03.f'%(fis)
-        df_cord = pd.read_csv(self.csvpath+fiscode+'-subs-cord.csv')
-        cords = df_cord.set_index('node').T.to_dict('list')
         subs = nt("substation",field_names=["cord"])
-        return subs(cord=cords)
+        data_substations = gpd.read_file(self.inppath+'eia/'+sub_file)
+        data_counties = gpd.read_file(self.inppath+'eia/'+county_file)
+        
+        county_polygon = list(data_counties[data_counties.COUNTYFP 
+                                            == fiscode].geometry.items())[0][1]
+        df_subs = data_substations.loc[data_substations.geometry.within(county_polygon)]
+        cord = dict([(t.ID, (t.LONGITUDE, t.LATITUDE)) \
+                     for t in df_subs.itertuples()])
+        cord = {int(k):cord[k] for k in cord}
+        return subs(cord=cord)
     
     
     def GetHourlyDemand(self,inppath,filename,fis=121):
@@ -480,14 +502,15 @@ class Query:
         return homes
     
     
-    def GetTransformers(self):
+    def GetTransformers(self,fis=121):
         """
         """
-        df_tsfr = pd.read_csv(self.csvpath+'tsfr-cord-load.csv')
+        fiscode = '%03.f'%(fis)
+        df_tsfr = pd.read_csv(self.csvpath+fiscode+'-tsfr-data.csv')
         tsfr = nt("Transformers",field_names=["cord","load","graph"])
-        dict_cord = dict([(t.TID, (t.long, t.lat)) for t in df_tsfr.itertuples()])
-        dict_load = dict([(t.TID, t.load) for t in df_tsfr.itertuples()])
-        df_tsfr_edges = pd.read_csv(self.csvpath+'tsfr-net.csv')
+        dict_cord = dict([(t.tid, (t.long, t.lat)) for t in df_tsfr.itertuples()])
+        dict_load = dict([(t.tid, t.load) for t in df_tsfr.itertuples()])
+        df_tsfr_edges = pd.read_csv(self.csvpath+fiscode+'-tsfr-net.csv')
         g = nx.from_pandas_edgelist(df_tsfr_edges)
         return tsfr(cord=dict_cord,load=dict_load,graph=g)
     
@@ -519,11 +542,10 @@ class Query:
         roads = road(graph=G,cord=cords,links=datalink)
         return homes,roads
         
-
-
-
-
-
+    
+   
+        
+        
 
 
 

@@ -211,7 +211,7 @@ def Initialize_Primary(subs,roads,tsfr,links):
     S2Node = get_substation_areas(subs,roads,graph)
     return graph,S2Node
 
-def plot_graph(graph,subdata=None,path=None,filename=None):
+def plot_graph(graph,subdata=None,path=None,filename=None,rcol = ['green']):
     """
     Plots the graph for representing the possible set of edges for generating the
     primary network.
@@ -226,19 +226,18 @@ def plot_graph(graph,subdata=None,path=None,filename=None):
     ax = fig.add_subplot(111)
     
     # Plot individual subgraphs
-    rcol = ['green']
     for i,nlist in enumerate(list(nx.connected_components(graph))):
         sub_graph = nx.subgraph(graph,list(nlist))
         col = ['black' if nodelabel[n]=='R' else rcol[i] for n in list(nlist)]
-        nx.draw_networkx(sub_graph,pos=nodepos,nodelist = list(nlist),node_size=20.0,
-                         node_color=col,width=2.0, edge_color='black',ax=ax,style='dashed',
+        nx.draw_networkx(sub_graph,pos=nodepos,nodelist = list(nlist),node_size=1.0,
+                         node_color=col,width=0.5, edge_color='black',ax=ax,style='dashed',
                          with_labels=False)
     
     # Scatter plot the substations
     if subdata != None:
         subx = subdata.cord[0]
         suby = subdata.cord[1]
-        ax.scatter(subx,suby,s=120.0,c='dodgerblue')
+        ax.scatter(subx,suby,s=500.0,marker='*',c='green')
     
     # Titles and labels for plot
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
@@ -248,11 +247,11 @@ def plot_graph(graph,subdata=None,path=None,filename=None):
     
     # Define legends for the plot
     leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=0,linestyle='dashed'),
-                Line2D([0], [0], color='white', markerfacecolor='dodgerblue', marker='o',markersize=10)]+\
+                Line2D([0], [0], color='white', markerfacecolor='green', marker='*',markersize=10)]+\
                 [Line2D([0], [0], color='white', markerfacecolor=c, marker='o',markersize=10) for c in rcol]
     ax.legend(leglines,['road network','substations']+\
-              ['transformer nodes' for i in range(len(rcol))],
-              loc='best',ncol=1,prop={'size': 20})
+              ['Partition '+str(i+1) for i in range(len(rcol))],
+              loc='best',ncol=5,prop={'size': 10})
     plt.show()
     if path != None:
         fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')

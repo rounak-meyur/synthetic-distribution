@@ -33,31 +33,37 @@ from pyBuildNetworklib import plot_graph
 
 
 #%% Get transformers and store them in csv
-q_object = Query(csvPath)
-gdf_home,homes = q_object.GetHomes()
-roads = q_object.GetRoads()
-subs = q_object.GetSubstations()
-tsfr = q_object.GetTransformers()
+fis=161
+q_object = Query(csvPath,inpPath)
+homes,roads = q_object.GetDataset(fislist=[161,770,775])
+subs = q_object.GetSubstations(fis=161)
+tsfr = q_object.GetTransformers(fis=161)
 
-df_hmap = pd.read_csv(csvPath+'home2link.csv')
-H2Link = dict([(t.HID, (t.source, t.target)) for t in df_hmap.itertuples()])
+fiscode = '%03.f'%(fis)
+df_hmap = pd.read_csv(csvPath+fiscode+'-home2link.csv')
+H2Link = dict([(t.hid, (t.source, t.target)) for t in df_hmap.itertuples()])
 L2Home = imap(H2Link)
-links = [l for l in L2Home if 0<len(L2Home[l])<=70]
-secondary_network_file = inpPath + 'secondary-network.txt'
+links = [l for l in L2Home if 0<len(L2Home[l])]
+secondary_network_file = csvPath + fiscode + '-sec-dist.txt'
 
 
 #%% Initialize Primary Network Generation Process
 graph,S2Node = init(subs,roads,tsfr,links)
 
-sub = 24664
+sub = 146410
 substation = nt("local_substation",field_names=["id","cord","nodes"])
 sub_data = substation(id=sub,cord=subs.cord[sub],nodes=S2Node[sub])
-
+sys.exit(0)
 #%% Generate primary distribution network
+color_code = ['black','lightcoral','red','chocolate','darkorange','goldenrod',
+              'olive','chartreuse','palegreen','seagreen','springgreen',
+              'darkslategray','darkturquoise','deepskyblue','dodgerblue',
+              'cornflowerblue','midnightblue','blue','mediumslateblue',
+              'darkviolet','violet','magenta','deeppink','crimson','lightpink']
 P = Primary(sub_data,homes,graph)
-plot_graph(P.graph,subdata=sub_data,path=figPath,filename=str(sub)+'-master')
-
-# sys.exit(0)
+plot_graph(P.graph,subdata=sub_data,path=figPath,filename=str(sub)+'-master',
+           rcol=color_code[1:nx.number_connected_components(P.graph)+1])
+sys.exit(0)
 
 
 P = Primary(sub_data,homes,graph)

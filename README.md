@@ -54,12 +54,33 @@ Mapped Residences | Local Transformers | Secondary Network
 ## Creating the primary distribution network
 The goal is to create the primary distribution network which connects the substations to the local transformers. For this purpose, we aggregate the load at residences to the local transformer locations which have been obtained as an output from the preceding step. The objective of the current step is to connect all these local transformer locations to the substation.
 
-We assume that the primary distribution network almost follows the road network and therefore the latter may be used as a proxy network for the former. Hence, the goal of the current step is to select edges along the road network graph such that all local transformer locations along road links are covered. The road network nodes which define the road network graph can be considered to be dummy points with no load, while the transformer locations have aggregated residential load demands. The road network nodes are only required to be covered in order to connect the local transformer points. In other words, the road network nodes cannot be leaf nodes in the created primary network.
+One of the challenges is to handle the large size of the network. For each county, there are few tens of thousands of identified transformer locations. Therefore, the first task is to partition the transformer nodes into separate groups/clusters such that each substation serves only the transformers in a given cluster. We assume that the primary network follows the road network, the clusters should remain connected through the road network. Otherwise, we would be left with multiple disconnected components in each cluster. We use a Voronoi clustering based on the shortest network distance in the graph formed by connecting the road network nodes and transformer nodes along it. The following figure shows the Voronoi partitions for the transformer nodes identified in Roanoke county of south-west Virginia. It is evident that the nearest geographically located nodes are not partioned in the same cluster; rather, nearest nodes based on the network distance are clustered. Two such clusters are shown in the adjacent figures.
+Voronoi Partitioning | Partition 1 | Partition 2
+:---: | :---| | :---:
+![png](src/figs/161-voronoi.png) | ![png](src/figs/161-voronoi-1.png) | ![png](src/figs/161-voronoi-2.png)
 
-Finally, a substation can have multiple feeder lines connecting different local group of residences. This is usual in a rural geographic region where such local groups are distinctly observable. Therefore, the primary network may be created as a forest of trees with the roots connected to the substation though high voltage feeder lines. The trees are rooted at some road network node and covers all the local transformers.
+The next task is to connect the transformers in individual partion/cluster. Since we assume that the primary distribution network almost follows the road network and therefore the latter may be used as a proxy network for the former. Hence, the goal of the current step is to select edges along the road network graph such that all local transformer locations along road links are covered. The road network nodes which define the road network graph can be considered to be dummy points with no load, while the transformer locations have aggregated residential load demands. The road network nodes are only required to be covered in order to connect the local transformer points. In other words, the road network nodes cannot be leaf nodes in the created primary network.
+
+Finally, a substation can have multiple feeder lines connecting different local group of residences. This is usual in a rural geographic region where such local groups are distinctly observable. Therefore, the primary network may be created as a forest of trees with the roots connected to the substation though high voltage feeder lines. The trees are rooted at some road network node and covers all the local transformers. This task is shown for a partition of Montgomery county of south-west Virginia. Here we formulate an optimization problem to identify the primary network. Thereafter, we conect it with the associated secondary to obtain the entire network.
 Road network | Primary Network | Entire Network
 :---: | :---: | :---:
 ![png](src/figs/24664-master.png) | ![png](src/figs/24664-primary.png) | ![png](src/figs/24664-network.png)
+
+However, the problem arises for large network sizes with more than 1000 transformer and road nodes in a partition. This implies that we need to solve an mixed integer linear program with few thousand binary variables. This, in turn, leads to a large computation time for obtaining small optimality gap using branch and cut method. Therefore, we go for further partitioning of the network into small sub-regions. We take a similar approach as above by partioning based on network distance. However, the Voronoi centers are considered to be the periphery nodes of a subnetwork with more than 1200 nodes. For example, when one of the partitions of a Roanoke county network is further partioned, we obtain the following clusters. The steps of partioning are listed below. 
+
+- Graph of  7039  is partioned to [1922, 5117]
+- Graph of  1922  is partioned to [1651, 4, 267]
+- Graph of  1651  is partioned to [771, 880]
+- Graph of  5117  is partioned to [2952, 2165]
+- Graph of  2952  is partioned to [1649, 1303]
+- Graph of  1649  is partioned to [726, 923]
+- Graph of  1303  is partioned to [400, 903]
+- Graph of  2165  is partioned to [1889, 276]
+- Graph of  1889  is partioned to [1098, 791]
+
+Partion 1 | Partion 2
+:---: | :---:
+![png](src/figs/121155-master.png) | ![png](src/figs/146410-master.png)
 
 ## Validating the created synthetic networks
 ### Operational Validation
