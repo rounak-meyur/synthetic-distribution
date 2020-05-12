@@ -16,7 +16,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-
+from collections import namedtuple as nt
 
 
 workPath = os.getcwd()
@@ -30,7 +30,8 @@ sys.path.append(libPath)
 from pyExtractDatalib import Query
 from pyBuildNetworklib import Initialize_Primary as init
 from pyBuildNetworklib import InvertMap as imap
-
+from pyBuildNetworklib import plot_graph
+from pyBuildNetworklib import Primary
 
 #%% Get transformers and store them in csv
 q_object = Query(csvPath,inpPath)

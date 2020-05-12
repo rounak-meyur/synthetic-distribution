@@ -29,7 +29,6 @@ from pyBuildNetworklib import Primary
 from pyBuildNetworklib import MeasureDistance as dist
 from pyBuildNetworklib import Initialize_Primary as init
 from pyBuildNetworklib import InvertMap as imap
-from pyBuildNetworklib import plot_graph
 
 
 #%% Get transformers and store them in csv
@@ -56,7 +55,7 @@ sub_data = substation(id=sub,cord=subs.cord[sub],nodes=S2Node[sub])
 sys.exit(0)
 
 #%% Generate primary distribution network
-P = Primary(sub_data,homes,graph)
+P = Primary(sub_data,homes,graph,min_node=300)
 P.get_sub_network(secondary_network_file,flowmax=800,feedermax=10)
 dist_net = P.dist_net
 

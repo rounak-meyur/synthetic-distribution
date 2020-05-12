@@ -16,6 +16,7 @@ from pyMILPlib import MILP_secondary,MILP_primary
 from scipy.spatial import cKDTree
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import time
 
 #%% Functions
 
@@ -521,18 +522,17 @@ class Primary:
     First the set of possible edges are identified from the links in road net-
     -work and transformer connections.
     """
-    def __init__(self,subdata,homes,master_graph,max_node=900):
+    def __init__(self,subdata,homes,master_graph,max_node=900,min_node=500):
         """
         """
-        self.max_node = max_node
         self.subdata = subdata
         self.homes = homes
         self.graph = nx.Graph()
-        self.__get_subgraph(master_graph)
+        self.__get_subgraph(master_graph,max_node,min_node)
         self.dist_net = nx.Graph()
         return
     
-    def __get_subgraph(self,master_graph):
+    def __get_subgraph(self,master_graph,max_node,min_node):
         """
         Get the subgraph of master graph from the nodes mapped to the Voronoi region
         of each substation. Thereafter, it calls the partioning function to create the
@@ -554,7 +554,8 @@ class Primary:
         nx.set_node_attributes(graph,hvdist,'distance')
         
         # Create partitions
-        self.__get_partitions(graph)
+        print("Partitioning...")
+        self.__get_partitions(graph,max_node,min_node)
         return
     
     def get_secondary(self,filename,roots):
@@ -583,7 +584,7 @@ class Primary:
         for t in roots: nodelist.extend(list(nx.descendants(sec_net,t)))
         return list(sec_net.subgraph(nodelist+roots).edges())
     
-    def __get_partitions(self,graph_list):
+    def __get_partitions(self,graph_list,max_node,min_node):
         """
         This function handles primary network creation for large number of nodes.
         It divides the network into multiple partitions of small networks and solves
@@ -591,15 +592,34 @@ class Primary:
         """
         if type(graph_list) == nx.Graph: graph_list = [graph_list]
         for g in graph_list:
-            if len(g) < self.max_node:
+            if len(g) < max_node:
                 self.graph = nx.compose(self.graph,g)
             else:
-                centers = nx.periphery(g)
-                cells = nx.voronoi_cells(g, centers, 'length')
-                nodelist = [cells[c] for c in centers]
-                sg_list = [nx.subgraph(g,nlist) for nlist in nodelist]
-                print("Graph of ",len(g)," is partioned to",[len(sg) for sg in sg_list])
-                self.__get_partitions(sg_list)
+                start = time.time()
+                edge_wt = nx.get_edge_attributes(g,'length')
+                edge_sorted = [k for k,_ in sorted(edge_wt.items(), 
+                                                   key=lambda item: item[1])][::-1]
+                for edge in edge_sorted:
+                    dummy = nx.Graph()
+                    dummy.add_edges_from([e for e in edge_wt])
+                    dummy.remove_edge(*edge)
+                    num_nodes = dummy.number_of_nodes()
+                    len_comp = [len(c) for c in list(nx.connected_components(dummy))]
+                    within_bds = [l for l in len_comp if num_nodes>l>=min_node]
+                    if len(within_bds)==len(len_comp):
+                        nodelist = [list(c) for c in list(nx.connected_components(dummy))]
+                        sglist = [nx.subgraph(g,nlist) for nlist in nodelist]
+                        break
+                    
+                # centers = nx.periphery(g)
+                # cells = nx.voronoi_cells(g, centers, 'length')
+                # nodelist = [cells[c] for c in centers]
+                # sglist = [nx.subgraph(g,nlist) for nlist in nodelist]
+                
+                end = time.time()
+                print("Graph of ",len(g)," is partioned to",
+                      [len(sg) for sg in sglist],"Time taken: ",end-start)
+                self.__get_partitions(sglist,max_node,min_node)
         return
     
     def optimal_network(self,fmax=400,feedmax=10,opt=True):
