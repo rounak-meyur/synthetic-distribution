@@ -56,12 +56,12 @@ Mapped Residences | Local Transformers | Secondary Network
 ## Creating the primary distribution network
 The goal is to create the primary distribution network which connects the substations to the local transformers. For this purpose, we aggregate the load at residences to the local transformer locations which have been obtained as an output from the preceding step. The objective of the current step is to connect all these local transformer locations to the substation.
 
-One of the challenges is to handle the large size of the network. For each county, there are few tens of thousands of identified transformer locations. Therefore, the first task is to partition the transformer nodes into separate groups/clusters such that each substation serves only the transformers in a given cluster. We assume that the primary network follows the road network, the clusters should remain connected through the road network. Otherwise, we would be left with multiple disconnected components in each cluster. We use a Voronoi clustering based on the shortest network distance in the graph formed by connecting the road network nodes and transformer nodes along it. The following figure shows the Voronoi partitions for the transformer nodes identified in Roanoke county of south-west Virginia. It is evident that the nearest geographically located nodes are not partioned in the same cluster; rather, nearest nodes based on the network distance are clustered. Two such clusters are shown in the adjacent figures.
-
+One of the challenges is to handle the large size of the network. For each county, there are few tens of thousands of identified transformer locations. Therefore, the first task is to partition the transformer nodes into separate groups/clusters such that each substation serves only the transformers in a given cluster. We assume that the primary network follows the road network, the clusters should remain connected through the road network. Otherwise, we would be left with multiple disconnected components in each cluster. We use a Voronoi clustering based on the shortest network distance in the graph formed by connecting the road network nodes and transformer nodes along it. The following figure shows the Voronoi partitions for the transformer nodes identified in Roanoke county of south-west Virginia. It is evident that the nearest geographically located nodes are not partioned in the same cluster; rather, nearest nodes based on the network distance are clustered.
 Base Network | Voronoi Partitioning
 :---: | :---:
 ![png](src/figs/161-voronoi-base.png) | ![png](src/figs/161-voronoi.png)
 
+The first two partitions obtained for two substations are shown in the following inset figures. We aim to solve the optimization problem for such individual partitions.
 Partition 1 | Partition 2
 :---: | :---:
 ![png](src/figs/161-voronoi-1.png) | ![png](src/figs/161-voronoi-2.png)
