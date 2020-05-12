@@ -62,7 +62,7 @@ ax = fig.add_subplot(111)
 for i,s in enumerate(list(S2Node.keys())):
     xpts = [nodepos[r][0] for r in S2Node[s]]
     ypts = [nodepos[r][1] for r in S2Node[s]]
-    ax.scatter(xpts,ypts,s=1.0,c=color_code[i])
+    ax.scatter(xpts,ypts,s=1.0,c=color_code[15])
     ax.scatter(subs.cord[s][0],subs.cord[s][1],s=500.0,c='green',
                marker='*')
     ax.scatter(subs.cord[s][0],subs.cord[s][1],s=100.0,c=color_code[i],
@@ -74,7 +74,7 @@ ax.set_title('Voronoi partitioning of nodes based on shortest-path distance metr
              fontsize=20.0)
 ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
 
-# sys.exit(0)
+sys.exit(0)
 #%% Inset figure
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
 axins = zoomed_inset_axes(ax, 0.5, loc=4)
@@ -93,7 +93,7 @@ axins.tick_params(bottom=False,left=False,labelleft=False,labelbottom=False)
 
 mark_inset(ax, axins, loc1=1, loc2=2, fc="none", ec="0.5")
 
-
+# sys.exit(0)
 #%% Plot the substations
 def display_data(ax,roads,homes,subs,showhome=True,showsub=True):
     """

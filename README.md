@@ -58,9 +58,13 @@ The goal is to create the primary distribution network which connects the substa
 
 One of the challenges is to handle the large size of the network. For each county, there are few tens of thousands of identified transformer locations. Therefore, the first task is to partition the transformer nodes into separate groups/clusters such that each substation serves only the transformers in a given cluster. We assume that the primary network follows the road network, the clusters should remain connected through the road network. Otherwise, we would be left with multiple disconnected components in each cluster. We use a Voronoi clustering based on the shortest network distance in the graph formed by connecting the road network nodes and transformer nodes along it. The following figure shows the Voronoi partitions for the transformer nodes identified in Roanoke county of south-west Virginia. It is evident that the nearest geographically located nodes are not partioned in the same cluster; rather, nearest nodes based on the network distance are clustered. Two such clusters are shown in the adjacent figures.
 
-Voronoi Partitioning | Partition 1 | Partition 2
-:---: | :---: | :---:
-![png](src/figs/161-voronoi.png) | ![png](src/figs/161-voronoi-1.png) | ![png](src/figs/161-voronoi-2.png)
+Base Network | Voronoi Partitioning
+:---: | :---:
+![png](src/figs/161-voronoi-base.png) | ![png](src/figs/161-voronoi.png)
+
+Partition 1 | Partition 2
+:---: | :---:
+![png](src/figs/161-voronoi-1.png) | ![png](src/figs/161-voronoi-2.png)
 
 The next task is to connect the transformers in individual partion/cluster. Since we assume that the primary distribution network almost follows the road network and therefore the latter may be used as a proxy network for the former. Hence, the goal of the current step is to select edges along the road network graph such that all local transformer locations along road links are covered. The road network nodes which define the road network graph can be considered to be dummy points with no load, while the transformer locations have aggregated residential load demands. The road network nodes are only required to be covered in order to connect the local transformer points. In other words, the road network nodes cannot be leaf nodes in the created primary network.
 
