@@ -62,7 +62,7 @@ ax = fig.add_subplot(111)
 for i,s in enumerate(list(S2Node.keys())):
     xpts = [nodepos[r][0] for r in S2Node[s]]
     ypts = [nodepos[r][1] for r in S2Node[s]]
-    ax.scatter(xpts,ypts,s=1.0,c=color_code[15])
+    ax.scatter(xpts,ypts,s=1.0,c=color_code[i])
     ax.scatter(subs.cord[s][0],subs.cord[s][1],s=500.0,c='green',
                marker='*')
     ax.scatter(subs.cord[s][0],subs.cord[s][1],s=100.0,c=color_code[i],
