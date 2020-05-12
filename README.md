@@ -76,7 +76,7 @@ Road network | Primary Network | Entire Network
 
 However, the problem arises for large network sizes with more than 1000 transformer and road nodes in a partition. This implies that we need to solve an mixed integer linear program with few thousand binary variables. This, in turn, leads to a large computation time for obtaining small optimality gap using branch and cut method. Therefore, we go for further partitioning of the network into small sub-regions. We take a similar approach as above by partioning based on network distance. However, the Voronoi centers are considered to be the periphery nodes of a subnetwork with more than 1200 nodes. For example, when one of the partitions of a Roanoke county network is further partioned, we obtain the following clusters. The steps of partioning are listed below. 
 
-<img align="right" width="500" height="500" src="src/figs/alg-periphery.png">
+<img align="right" width="400" height="400" src="src/figs/alg-periphery.png">
 
 - Graph of  7039  is partioned to [1922, 5117]
 - Graph of  1922  is partioned to [1651, 4, 267]
