@@ -27,19 +27,20 @@ figPath = workPath + "/figs/"
 tmpPath = workPath + "/temp/"
 
 sys.path.append(libPath)
-from pyExtractDatalib import Query
+from pyExtractDatalib import Query,getareas
 from pyBuildNetworklib import Initialize_Primary as init
 from pyBuildNetworklib import InvertMap as imap
 from pyBuildNetworklib import plot_graph
 from pyBuildNetworklib import Primary
 
 #%% Get transformers and store them in csv
+fiscode = '161'
 q_object = Query(csvPath,inpPath)
-homes,roads = q_object.GetDataset(fislist=[161,770,775])
-subs = q_object.GetSubstations(fis=161)
-tsfr = q_object.GetTransformers(fis=161)
+areas = getareas(inpPath,fiscode)
+homes,roads = q_object.GetDataset(fislist=areas)
+subs = q_object.GetSubstations(fis=fiscode)
+tsfr = q_object.GetTransformers(fis=fiscode)
 
-fiscode = '%03.f'%(161)
 df_hmap = pd.read_csv(csvPath+fiscode+'-home2link.csv')
 H2Link = dict([(t.hid, (t.source, t.target)) for t in df_hmap.itertuples()])
 L2Home = imap(H2Link)
@@ -135,7 +136,7 @@ ax = display_data(ax,roads,homes,subs,showhome=False)
 
 
 #%% Generate partitions in each cluster and plot it
-sub = 146410
+sub = 147330
 substation = nt("local_substation",field_names=["id","cord","nodes"])
 sub_data = substation(id=sub,cord=subs.cord[sub],nodes=S2Node[sub])
 

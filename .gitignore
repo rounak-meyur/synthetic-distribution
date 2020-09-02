@@ -1,12 +1,5 @@
 src/temp/
 src/csv/
 src/input/
-src/figs/figs-kdd
-src/figs/results-dec12
-src/figs/results-nov20
-src/figs/ensemble-nopf
-src/figs/tmp
-src/figs/prim-ensemble
-src/figs/ensemble-stochastic
-src/figs/gifs
+src/figs
 src/Libraries/__pycache__

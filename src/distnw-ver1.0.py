@@ -32,7 +32,7 @@ figPath = workPath + "/figs/"
 tmpPath = workPath + "/temp/"
 
 sys.path.append(libPath)
-from pyExtractDatalib import Query
+from pyExtractDatalib import Query,getareas
 from pyBuildNetworklib import Spider
 
 def display_data(ax,roads,homes,showhome=True,colors=['royalblue','seagreen']):
@@ -146,10 +146,12 @@ def display_secnet(roads,link,forest,roots):
     return
 
 #%% Initialization of data sets and mappings
+fiscode = '161'
 q_object = Query(csvPath,inpPath)
-homes,roads = q_object.GetDataset(fislist=[161,770,775])
+areas = getareas(inpPath,fiscode)
+homes,roads = q_object.GetDataset(fislist=areas)
 
-fiscode = '%03.f'%(161)
+
 df_hmap = pd.read_csv(csvPath+fiscode+'-home2link.csv')
 H2Link = dict([(t.hid, (t.source, t.target)) for t in df_hmap.itertuples()])
 spider_obj = Spider(homes,roads,H2Link)

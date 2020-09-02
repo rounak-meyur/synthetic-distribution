@@ -2,9 +2,7 @@
 """
 Created on Wed Sep 12 12:46:36 2018
 
-Authors: Dr Anil Vullikanti
-         Dr Henning Mortveit
-         Rounak Meyur
+Authors: Rounak Meyur
 
 Description: This library contains classes, methods etc to extract data from
 the noldor database with required credentials. 
@@ -13,293 +11,18 @@ the noldor database with required credentials.
 from __future__ import print_function
 
 import sys
-import argparse
-import cx_Oracle
-import pickle
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import networkx as nx
-from shapely.geometry import LineString
+from shapely.geometry import LineString,Point
 from collections import namedtuple as nt
-
-
-# -----------------------------------------------------------------------------
-# Classes
-    
-class Error(Exception):
-    """Base class for exceptions in this module."""
-    pass
-
-class DBError(Error):
-    """Exception raised for errors in database handling.
-
-    Attributes:
-        expression -- input expression in which the error occurred
-        message -- explanation of the error
-    """
-
-    def __init__(self, expression, message):
-        self.expression = expression
-        self.message = message
-
-#%% Oracle related functions
-# -----------------------------------------------------------------------------
-# Functions
-
-def CreateParser():
-    '''
-    '''
-    parser = argparse.ArgumentParser(
-            prog = "%prog <username> <password> [options]", 
-            
-            description = '''This program connects with the noldor database of
-            NDSSL and extracts information from the synthetic population data''',
-            
-            version = "%prog 1.0")
-    
-    parser.add_argument("username", type = str, metavar = "username", 
-                        help = "Username to connect to database")
-    
-    parser.add_argument("password", type = str, metavar = "password", 
-                        help = "Password for the username")
-    
-    parser.add_argument("-t", "--host", type = str, action = "store",
-                        default = "noldor-db.vbi.vt.edu", dest = "host_name", 
-                        help = "Host name for the database")
-    
-    parser.add_argument("-p", "--port", type = int, action = "store",
-                        default = 1521, dest = "port_no",
-                        help = "Port number to connect to the database")
-    
-    parser.add_argument("-s", "--service", type = str, action = "store",
-                        default = "ndssl.bioinformatics.vt.edu", dest = "serv_name", 
-                        help = "Service name to connect to database")
-    
-    return parser
-
-
-def CreateConnection(username, passwd, host, port, service):
-    '''
-    Connect with the noldor Oracle database with necessary information
-    
-    Inputs: username: Username for the user account in the noldor synthetic 
-                      population database
-            passwd: Password for the user account in the noldor database
-            host: host ID for the account
-            port: port number
-            service: service ID
-    
-    Output: conn: connection object
-    '''
-    try :
-        dsn_tns = cx_Oracle.makedsn(host, port, service_name=service)
-    except :
-        raise DBError('CreateConnection', 'dsn_tns error')
-        return None
-
-    try :
-        conn = cx_Oracle.connect(user=username, password=passwd, dsn=dsn_tns)
-    except :
-        raise DBError('CreateConnection',  'error authenticating')
-        return None
-
-    return conn
-
-
-def CreateCursor(connection):
-    '''
-    '''
-    try :
-        c = connection.cursor()
-    except :
-        raise DBError('CreateCursor', 'Error creating cursor')
-        return None
-
-    return c
-
-
-# -----------------------------------------------------------------------------
-# Extract data for substations in the required county
-    
-def GetConditionHomeDat(counties):
-    
-    cond = []
-    for x in counties:
-        cond.append("COUNTY='"+str(x)+"'")
-    if len(cond)!=1:
-        condition = ' OR '.join(cond)
-    else:
-        condition = cond[0]
-    return condition
-
-
-# -----------------------------------------------------------------------------
-# Extract data for required county
-    
-def ExtractInfo(cursor,ID,Long,Lat,Zone,Table,Condition):
-    
-    query = "SELECT %s,%s FROM %s WHERE %s" % (Long, Lat, Table, Condition)
-    try:
-        cursor.execute(query)
-    except:
-        raise DBError('Query Error', 'Error in the query sent')
-        return None
-    rVal1 = cursor.fetchall()
-    #print type(rVal1[0])
-    #for i in range(len(rVal1)):
-      #print "bbb", i, rVal1[i]
-    
-    query = "SELECT %s FROM %s WHERE %s" % (ID, Table, Condition)
-    try:
-        cursor.execute(query)
-    except:
-        raise DBError('Query Error', 'Error in the query sent')
-        return None
-    rVal2 = cursor.fetchall()
-    
-    # Get the IDs in suitable list format
-    locID = [x[0] for x in rVal2]
-    
-    query = "SELECT %s FROM %s WHERE %s" % (Zone, Table, Condition)
-    try:
-        cursor.execute(query)
-    except:
-        raise DBError('Query Error', 'Error in the query sent')
-        return None
-    rVal3 = cursor.fetchall()
-    zones = [x[0] for x in list(set(rVal3))]
-    
-    return (rVal1,locID,zones)
-
-
-# -----------------------------------------------------------------------------
-# Extract data for substations in the required county
-    
-def GetCondition(zones):
-    
-    cond = []
-    for z in zones:
-        cond.append("ZIPCODE='"+str(z)+"'")
-    condition = ' OR '.join(cond)
-    return condition
-    
-
-def get_files_from_db(homeact_out_fname, subpos_out_fname):
-    
-    # -------------------------------------------------------------------------
-    # Parser Construction
-    parser = CreateParser()
-    args = parser.parse_args()
-    if len(vars(args)) != 5:
-        parser.print_usage()
-        sys.exit(0)
-    
-    CountyList = [121]
-    # -------------------------------------------------------------------------
-    # Connect with database
-    try :
-        conn = CreateConnection(args.username, args.password, args.host_name,
-                               args.port_no, args.serv_name)
-    except DBError as dbe :
-        print (dbe.message)
-        sys.exit(-1)
-    
-    try :
-        c = CreateCursor(conn)
-    except DBError as dbe :
-        print (dbe.message)
-        sys.exit(-1)
-    
-    
-    # -------------------------------------------------------------------------
-    # Get Home Locations
-    table1 = 'PROTOPOP.VA_HOME_LOCS_2015_V3'
-    Col_0 = 'ID'
-    Col_1 = 'X'
-    Col_2 = 'Y'
-    Col_3 = 'ZONE'
-    Cond1 = GetConditionHomeDat(CountyList)
-    
-    try :
-        (Home_Long_Lat,HomeID,Home_Zip) = ExtractInfo(c,Col_0,Col_1,Col_2,Col_3,table1,Cond1)
-    except DBError as dbe :
-        print (dbe.message)
-        sys.exit(-1)
-        
-    
-    # -------------------------------------------------------------------------
-    # Get Activity Locations
-    table2 = 'PROTOPOP.VA_ACT_LOCS_2015_V3'
-    Col_0 = 'ID'
-    Col_1 = 'X'
-    Col_2 = 'Y'
-    Col_3 = 'ZONE'
-    Cond2 = '('+Cond1+') AND STATE=51 AND ZONE!=14472'
-    
-    try :
-        (Actv_Long_Lat,ActvID,Actv_Zip) = ExtractInfo(c,Col_0,Col_1,Col_2,Col_3,table2,Cond2)
-    except DBError as dbe :
-        print (dbe.message)
-        sys.exit(-1)
-    
-    
-    # -------------------------------------------------------------------------
-    # Create a dictionary with key as Home/Activity ID and value as longitude latitude tuple
-    Position_HomeActv = {}
-    for k in HomeID:
-        ind = HomeID.index(k)
-        Position_HomeActv[k]=Home_Long_Lat[ind]
-    for k in ActvID:
-        ind = ActvID.index(k)
-        Position_HomeActv[k]=Actv_Long_Lat[ind]
-
-    homeact_output = open(homeact_out_fname, 'wb')
-    pickle.dump(Position_HomeActv, homeact_output)
-
-    
-    # -------------------------------------------------------------------------
-    # Get the list of all zipcodes (homes and activity locations)
-    zones = []
-    zones.extend(Home_Zip)
-    zones.extend(Actv_Zip)
-     
-    
-    # -------------------------------------------------------------------------
-    # Get substation locations in the zipcodes
-    table3 = 'PROTOPOP.SUBSTATIONS_LOCS'
-    Col_0 = 'OBJECTID'
-    Col_1 = 'X'
-    Col_2 = 'Y'
-    Col_3 = 'ZIPCODE'
-    Cond3 = GetCondition(zones)
-    
-    try :
-        (Substation_Long_Lat,SubsID,Subs_Zip) = ExtractInfo(c,Col_0,Col_1,Col_2,Col_3,table3,Cond3)
-    except DBError as dbe :
-        print (dbe.message)
-        sys.exit(-1)
-    
-    
-    # -------------------------------------------------------------------------
-    # Create a dictionary with key as Home/Activity ID and value as longitude latitude tuple
-    Position_Subs = {}
-    for k in SubsID:
-        ind = SubsID.index(k)
-        Position_Subs[k]=Substation_Long_Lat[ind]
-
-    subpos_output = open(subpos_out_fname, 'wb')
-    pickle.dump(Position_Subs, subpos_output)
-    subpos_output.close()
-    
-    # -------------------------------------------------------------------------
-    # Close connection with database
-    conn.close()
-
-#%% Functions
 from geographiclib.geodesic import Geodesic
 from pyqtree import Index
-from shapely.geometry import Point
+
+
+#%% Functions
+
 
 def MeasureDistance(pt1,pt2):
     '''
@@ -362,6 +85,7 @@ def combine_components(graph,cords,radius = 0.01):
         edgelist.append(nodepairs[np.argmin(dist)])
     return edgelist
 
+
 #%% Classes
 
 class Query:
@@ -372,75 +96,74 @@ class Query:
         '''
         self.inppath = inppath
         self.csvpath = csvpath
-        self.area = self.__getareacode()
         return
     
-    def __getareacode(self):
+    def GetRoads(self,fis='121',level=[1,2,3,4,5],thresh=0):
         """
         """
-        dictarea = {}
-        with open(self.inppath+"areacode.txt") as file:
-            for temp in file.readlines():
-                data = temp.strip('\n').split('\t')
-                dictarea[data[0]] = data[1]
-        return dictarea
-    
-    def GetRoads(self,fis=121,level=[1,2,3,4,5],thresh=0):
-        """
-        """
-        fiscode = '%03.f'%(fis)
-        place = self.area[fiscode]
-        corefile = "nrv/core-link-file-" + place + ".txt"
-        linkgeom = "nrv/link-file-" + place + ".txt"
-        nodegeom = "nrv/node-geometry-" + place + ".txt"
+        corefile = "nrv/core-link-file-" + fis + ".txt"
+        linkgeom = "nrv/link-file-" + fis + ".txt"
+        nodegeom = "nrv/node-geometry-" + fis + ".txt"
         
         datalink = {}
         roadcord = {}
         edgelist = []
         
         # Get edgelist from the core link file
-        with open(self.inppath+corefile) as file:
-            for temp in file.readlines()[1:]:
-                edge = tuple([int(x) for x in temp.strip("\n").split("\t")[0:2]])
-                lvl = int(temp.strip("\n").split("\t")[-1])
-                if (edge not in edgelist) and ((edge[1],edge[0]) not in edgelist):
-                    edgelist.append(edge)
-                    datalink[edge] = {'level':lvl,'geometry':None}
+        df_core = pd.read_table(self.inppath+corefile,header=0,
+                        names=['src','dest','fclass'])
+        for i in range(len(df_core)):
+            edge = (df_core.loc[i,'src'],df_core.loc[i,'dest'])
+            fclass = df_core.loc[i,'fclass']
+            if (edge not in edgelist) and ((edge[1],edge[0]) not in edgelist):
+                edgelist.append(edge)
+                datalink[edge] = {'level':fclass,'geometry':None}
+        
         # Get node coordinates from the node geometry file            
-        with open(self.inppath+nodegeom) as file:
-            for temp in file.readlines()[1:]:
-                data = temp.strip('\n').split('\t')
-                roadcord[int(data[0])]=[float(data[1]),float(data[2])]
+        df_node = pd.read_table(self.inppath+nodegeom,header=0,
+                                names=['id','long','lat'])
+        roadcord = dict([(n.id, (n.long, n.lat)) \
+                         for n in df_node.itertuples()])
         
         # Get link geometry from the link geometry file
-        with open(self.inppath+linkgeom) as file:
-            for temp in file.readlines()[1:]:
-                data = temp.strip("\n").split("\t")
-                edge = tuple([int(x) for x in data[3:5]])
-                pts = [tuple([float(x) for x in pt.split(' ')]) \
-                        for pt in data[10].lstrip('MULTILINESTRING((').rstrip('))').split(',')]
-                geom = LineString(pts)
-                if (edge in edgelist):
-                    datalink[edge]['geometry']=geom
-                elif ((edge[1],edge[0]) in edgelist):
-                    datalink[(edge[1],edge[0])]['geometry']=geom
-                else:
-                    print(','.join([str(x) for x in list(edge)])+": not in edgelist")
+        colnames = ['ref_in_id','nref_in_id','the_geom']
+        coldtype = {'ref_in_id':'Int64','nref_in_id':'Int64','the_geom':'str'}
+        df_link = pd.read_table(self.inppath+linkgeom,sep=',',
+                                usecols=colnames,dtype=coldtype)
+        for i in range(len(df_link)):
+            edge = (df_link.loc[i,'ref_in_id'],df_link.loc[i,'nref_in_id'])
+            pts = [tuple([float(x) for x in pt.split(' ')]) \
+                    for pt in df_link.loc[i,'the_geom'].lstrip('MULTILINESTRING((').rstrip('))').split(',')]
+            geom = LineString(pts)
+            if (edge in edgelist):
+                datalink[edge]['geometry']=geom
+            elif ((edge[1],edge[0]) in edgelist):
+                datalink[(edge[1],edge[0])]['geometry']=geom
+            else:
+                print(','.join([str(x) for x in list(edge)])+": not in edgelist")
+        
+        
         # Update the link dictionary with missing geometries    
         for edge in datalink:
             if datalink[edge]['geometry']==None:
                 pts = [tuple(roadcord[r]) for r in list(edge)]
                 geom = LineString(pts)
                 datalink[edge]['geometry'] = geom
-                
+        
         # Create networkx graph from edges in the level list
         listedge = [edge for edge in edgelist if datalink[edge]['level'] in level]
         graph = nx.Graph(listedge)
+        
+        # Join disconnected components in the road network
+        new_edges = combine_components(graph,roadcord,radius=0.1)
+        graph.add_edges_from(new_edges)
+        datalink.update({edge:{'level':5,'geometry':LineString([tuple(roadcord[r]) \
+                          for r in list(edge)])} for edge in new_edges})
         road = nt("road",field_names=["graph","cord","links"])
         return road(graph=graph,cord=roadcord,links=datalink)
     
     
-    def GetSubstations(self,fis=121,sub_file='Electric_Substations.shp',
+    def GetSubstations(self,fis='121',sub_file='Electric_Substations.shp',
                         county_file='county.shp'):
         """
         Gets the list of substations within the county polygon
@@ -459,13 +182,11 @@ class Query:
         None.
         
         """
-        fiscode = '%03.f'%(fis)
         subs = nt("substation",field_names=["cord"])
         data_substations = gpd.read_file(self.inppath+'eia/'+sub_file)
         data_counties = gpd.read_file(self.inppath+'eia/'+county_file)
         
-        county_polygon = list(data_counties[data_counties.COUNTYFP 
-                                            == fiscode].geometry.items())[0][1]
+        county_polygon = list(data_counties[data_counties.COUNTYFP == fis].geometry.items())[0][1]
         df_subs = data_substations.loc[data_substations.geometry.within(county_polygon)]
         cord = dict([(t.ID, (t.LONGITUDE, t.LATITUDE)) \
                      for t in df_subs.itertuples()])
@@ -473,23 +194,10 @@ class Query:
         return subs(cord=cord)
     
     
-    def GetHourlyDemand(self,inppath,filename,fis=121):
+    def GetHomes(self,fis='121'):
         '''
         '''
-        fiscode = '%03.f'%(fis)
-        df_all = pd.read_csv(inppath+filename)
-        df_home = df_all[['hid','longitude','latitude']]
-        for i in range(1,25):
-            df_home['hour'+str(i)] = df_all['P'+str(i)]+df_all['A'+str(i)]
-        df_home.to_csv(self.csvpath+fiscode+'-home-load.csv',index=False)
-        return
-    
-    
-    def GetHomes(self,fis=121):
-        '''
-        '''
-        fiscode = '%03.f'%(fis)
-        df_home = pd.read_csv(self.csvpath+fiscode+'-home-load.csv')
+        df_home = pd.read_csv(self.csvpath+fis+'-home-load.csv')
         df_home['average'] = pd.Series(np.mean(df_home.iloc[:,3:27].values,axis=1))
         df_home['peak'] = pd.Series(np.max(df_home.iloc[:,3:27].values,axis=1))
         
@@ -502,45 +210,117 @@ class Query:
         return homes
     
     
-    def GetTransformers(self,fis=121):
+    def GetTransformers(self,fis='121'):
         """
         """
-        fiscode = '%03.f'%(fis)
-        df_tsfr = pd.read_csv(self.csvpath+fiscode+'-tsfr-data.csv')
+        df_tsfr = pd.read_csv(self.csvpath+fis+'-data/'+fis+'-tsfr-data.csv',
+                              header=None,names=['tid','long','lat','load'])
         tsfr = nt("Transformers",field_names=["cord","load","graph"])
         dict_cord = dict([(t.tid, (t.long, t.lat)) for t in df_tsfr.itertuples()])
         dict_load = dict([(t.tid, t.load) for t in df_tsfr.itertuples()])
-        df_tsfr_edges = pd.read_csv(self.csvpath+fiscode+'-tsfr-net.csv')
+        df_tsfr_edges = pd.read_csv(self.csvpath+fis+'-data/'+fis+'-tsfr-net.csv',
+                                    header=None,names=['source','target'])
         g = nx.from_pandas_edgelist(df_tsfr_edges)
         return tsfr(cord=dict_cord,load=dict_load,graph=g)
     
     
-    def GetDataset(self,fislist=[121]):
+    def GetDataset(self,fis='121'):
         """
         """
-        home = nt("home",field_names=["cord","profile","peak","average"])
-        road = nt("road",field_names=["graph","cord","links"])
-        dict_cord={}; dict_profile={}; dict_peak={}; dict_avg={}
-        G = nx.Graph(); cords={};datalink={}
-        
-        for fis in fislist:
-            homes_fis = self.GetHomes(fis=fis)
-            roads_fis = self.GetRoads(fis=fis)
-            dict_cord.update(homes_fis.cord); dict_profile.update(homes_fis.profile)
-            dict_peak.update(homes_fis.peak); dict_avg.update(homes_fis.average)
-            G = nx.compose(G,roads_fis.graph); cords.update(roads_fis.cord)
-            datalink.update(roads_fis.links)
-        
-        # Form the single network graph
-        new_edges = combine_components(G,cords)
-        G.add_edges_from(new_edges)
-        datalink.update({edge:{'level':5,'geometry':LineString([tuple(cords[r]) \
-                          for r in list(edge)])} for edge in new_edges})
-        
-        homes = home(cord=dict_cord,profile=dict_profile,
-                     peak=dict_peak,average=dict_avg)
-        roads = road(graph=G,cord=cords,links=datalink)
+        homes = self.GetHomes(fis=fis)
+        roads = self.GetRoads(fis=fis)
         return homes,roads
+    
+    def GetAllRoads(self,areas):
+        """
+        """
+        road_graph = nx.Graph()
+        road_cord = {}
+        road_data = {}
+        for area in areas:
+            roads = self.GetRoads(fis=area)
+            road_graph = nx.compose(road_graph,roads.graph)
+            road_cord.update(roads.cord)
+            road_data.update(roads.links)
+        road = nt("road",field_names=["graph","cord","links"])
+        return road(graph=road_graph,cord=road_cord,links=road_data)
+    
+    def GetAllTransformers(self,areas):
+        tsfr_cord = {}
+        tsfr_load = {}
+        tsfr_graph = nx.Graph()
+        for area in areas:
+            tsfr = self.GetTransformers(fis=area)
+            tsfr_graph = nx.compose(tsfr_graph,tsfr.graph)
+            tsfr_cord.update(tsfr.cord)
+            tsfr_load.update(tsfr.load)
+        tsfr = nt("Transformers",field_names=["cord","load","graph"])
+        return tsfr(cord=tsfr_cord,load=tsfr_load,graph=tsfr_graph)
+    
+    def GetAllMappings(self,areas):
+        links = []
+        for area in areas:
+            with open(self.csvpath+area+'-data/'+area+'-link2home.txt') as f:
+                lines = f.readlines()
+            edgedata = [line.strip('\n').split('\t')[0] for line in lines]
+            links += [tuple([int(x) for x in edge.split(',')]) for edge in edgedata]
+        return links
+    
+    def GetAllSubstations(self,sub_file='Electric_Substations.shp',
+                        state_file='states.shp'):
+        """
+        Gets the list of substations within the county polygon
+        
+        Parameters
+        ----------
+        fis : TYPE
+            DESCRIPTION.
+        sub_file : TYPE, optional
+            DESCRIPTION. The default is 'Electric_Substations.shp'.
+        county_file : TYPE, optional
+            DESCRIPTION. The default is 'county.shp'.
+        
+        Returns
+        -------
+        None.
+        
+        """
+        subs = nt("substation",field_names=["cord"])
+        data_substations = gpd.read_file(self.inppath+'eia/'+sub_file)
+        data_states = gpd.read_file(self.inppath+'eia/'+state_file)
+        
+        state_polygon = list(data_states[data_states.STATE_ABBR == 
+                                 'VA'].geometry.items())[0][1]
+        df_subs = data_substations.loc[data_substations.geometry.within(state_polygon)]
+        cord = dict([(t.ID, (t.LONGITUDE, t.LATITUDE)) \
+                     for t in df_subs.itertuples()])
+        cord = {int(k):cord[k] for k in cord}
+        return subs(cord=cord)
+    
+    def GetAllSecondary(self,areas):
+        """
+        """
+        lines = []
+        for area in areas:
+            with open(self.csvpath+area+'-data/'+area+'-sec-dist.txt') as f:
+                lines += f.readlines()
+        secnet = nx.Graph()
+        edgelist = []
+        nodepos = {}
+        nodelabel = {}
+        for temp in lines:
+            e = temp.strip('\n').split('\t')
+            edgelist.append((int(e[0]),int(e[4])))
+            nodepos[int(e[0])]=[float(e[2]),float(e[3])]
+            nodepos[int(e[4])]=[float(e[6]),float(e[7])]
+            nodelabel[int(e[0])]=e[1]
+            nodelabel[int(e[4])]=e[5]
+        secnet.add_edges_from(edgelist)
+        nx.set_node_attributes(secnet,nodelabel,'label')
+        nx.set_node_attributes(secnet,nodepos,'cord')
+        return secnet
+        
+        
         
     
    

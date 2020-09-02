@@ -4,19 +4,19 @@ Created on Mon Sep 30 11:01:21 2019
 
 @author: rounak
 """
+import sys
 from geographiclib.geodesic import Geodesic
 import networkx as nx
-import seaborn as sns
 from matplotlib import cm
 import numpy as np
 from scipy.spatial import Delaunay
 from itertools import combinations
-from shapely.geometry import LineString,MultiPoint,LinearRing
+from shapely.geometry import LineString,MultiPoint,LinearRing,Point
 from pyMILPlib import MILP_secondary,MILP_primary
 from scipy.spatial import cKDTree
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-import time
+from pyqtree import Index
 
 #%% Functions
 
@@ -46,7 +46,7 @@ def InvertMap(input_dict):
             output_dict[input_dict[key]]=[key]
     return output_dict
 
-def read_network(filename,homes):
+def read_primary(filename):
     """
     Read the txt file containing the edgelist of the generated synthetic network and
     generates the corresponding networkx graph. The graph has the necessary node and
@@ -54,7 +54,6 @@ def read_network(filename,homes):
     
     Inputs:
         filename: name of the .txt file
-        homes: named tuple for residential consumer data
         
     Output:
         graph: networkx graph
@@ -93,15 +92,35 @@ def read_network(filename,homes):
     # Create the networkx graph
     graph = nx.Graph()
     graph.add_edges_from(edges)
-    nodeload = {n:homes.average[n]*0.001 if nodelabel[n]=='H' else 0.0 \
-                for n in list(graph.nodes())}
     nx.set_edge_attributes(graph,edgelabel,'label')
     nx.set_edge_attributes(graph,edge_r,'r')
     nx.set_edge_attributes(graph,edge_x,'x')
     nx.set_node_attributes(graph,nodelabel,'label')
     nx.set_node_attributes(graph,nodepos,'cord')
-    nx.set_node_attributes(graph,nodeload,'load')
     return graph
+
+def bounds(pt,radius):
+    return (pt.x-radius, pt.y-radius, pt.x+radius, pt.y+radius)
+
+def find_nearest_node(center_cord,node_cord):
+    xmin,ymin = np.min(np.array(list(node_cord.values())),axis=0)
+    xmax,ymax = np.max(np.array(list(node_cord.values())),axis=0)
+    bbox = (xmin,ymin,xmax,ymax)
+    idx = Index(bbox)
+    
+    nodes = []
+    for i,n in enumerate(list(node_cord.keys())):
+        node_geom = Point(node_cord[n])
+        node_bound = bounds(node_geom,0.0)
+        idx.insert(i,node_bound)
+        nodes.append((node_geom, node_bound, n))
+    
+    pt_center = Point(center_cord)
+    center_bd = bounds(pt_center,0.1)
+    matches = idx.intersect(center_bd)
+    closest_node = min(matches,key=lambda i: nodes[i][0].distance(pt_center))
+    return nodes[closest_node][-1]
+    
 
 def create_master_graph(roads,tsfr,links):
     """
@@ -112,9 +131,9 @@ def create_master_graph(roads,tsfr,links):
     road_edges = list(roads.graph.edges())
     tsfr_edges = list(tsfr.graph.edges())
     for edge in links:
-        try:
+        if edge in road_edges:
             road_edges.remove(edge)
-        except:
+        elif (edge[1],edge[0]) in road_edges:
             road_edges.remove((edge[1],edge[0]))
     edgelist = road_edges + tsfr_edges
     graph = nx.Graph()
@@ -127,8 +146,8 @@ def create_master_graph(roads,tsfr,links):
     
     # Length of edges
     edge_length = {e:MeasureDistance(nodepos[e[0]],nodepos[e[1]]) \
-                   for e in edgelist}
-    nx.set_edge_attributes(graph,edge_length,name='hop')
+                    for e in edgelist}
+    nx.set_edge_attributes(graph,edge_length,name='length')
     
     # Label the nodes in network
     node_label = {n:'T' if n in tsfr.cord else 'R' for n in list(graph.nodes())}
@@ -176,16 +195,16 @@ def get_substation_areas(subs,roads,graph):
     S2Near = {}
     for s in S2Node:
         nodes = [n for n in S2Node[s] if n in roads.cord]
-        dis = [MeasureDistance(subs.cord[s],nodepos[n]) for n in nodes]
-        S2Near[s] = nodes[dis.index(min(dis))]
+        nodecord = {n: nodepos[n] for n in nodes}
+        S2Near[s] = find_nearest_node(subs.cord[s],nodecord)
     
     # Compute Voronoi cells with network distance 
     centers = list(S2Near.values())
-    cells = nx.voronoi_cells(graph, centers, 'hop')
+    cells = nx.voronoi_cells(graph, centers, 'length')
     
     # Recompute Voronoi cells for larger primary networks
     centers = [c for c in centers if len(cells[c])>100]
-    cells = nx.voronoi_cells(graph, centers, 'hop')
+    cells = nx.voronoi_cells(graph, centers, 'length')
     
     # Recompute S2Near and S2Node
     S2Near = {s:S2Near[s] for s in S2Near if S2Near[s] in centers}
@@ -212,6 +231,34 @@ def Initialize_Primary(subs,roads,tsfr,links):
     S2Node = get_substation_areas(subs,roads,graph)
     return graph,S2Node
 
+def read_master_graph(path,sub):
+    with open(path+str(sub)+'-master.txt') as f:
+        lines = f.readlines()
+    edgelist = []
+    nodepos = {}
+    nodeload = {}
+    nodedist = {}
+    nodelabel = {}
+    for line in lines:
+        l = line.strip('\n').split('\t')
+        edgelist.append((int(l[0]),int(l[6])))
+        nodelabel[int(l[0])] = l[1]
+        nodeload[int(l[0])] = float(l[4])
+        nodedist[int(l[0])] = float(l[5])
+        nodepos[int(l[0])] = [float(l[2]),float(l[3])]
+        nodepos[int(l[6])] = [float(l[8]),float(l[9])]
+        nodelabel[int(l[6])] = l[7]
+        nodeload[int(l[6])] = float(l[10])
+        nodedist[int(l[6])] = float(l[11])
+    
+    graph = nx.Graph()
+    graph.add_edges_from(edgelist)
+    nx.set_node_attributes(graph,nodelabel,'label')
+    nx.set_node_attributes(graph,nodeload,'load')
+    nx.set_node_attributes(graph,nodedist,'distance')
+    nx.set_node_attributes(graph,nodepos,'cord')
+    return graph
+
 def plot_graph(graph,subdata=None,path=None,filename=None,rcol = ['green']):
     """
     Plots the graph for representing the possible set of edges for generating the
@@ -230,7 +277,7 @@ def plot_graph(graph,subdata=None,path=None,filename=None,rcol = ['green']):
     for i,nlist in enumerate(list(nx.connected_components(graph))):
         sub_graph = nx.subgraph(graph,list(nlist))
         col = ['black' if nodelabel[n]=='R' else rcol[i] for n in list(nlist)]
-        nx.draw_networkx(sub_graph,pos=nodepos,nodelist = list(nlist),node_size=1.0,
+        nx.draw_networkx(sub_graph,pos=nodepos,nodelist = list(nlist),node_size=10.0,
                          node_color=col,width=0.5, edge_color='black',ax=ax,style='dashed',
                          with_labels=False)
     
@@ -257,6 +304,51 @@ def plot_graph(graph,subdata=None,path=None,filename=None,rcol = ['green']):
     if path != None:
         fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
     return
+
+
+def combine_primary_secondary(primnet,master_secnet):
+    """
+    Create a network with the primary network and part of the associated secondary
+    network. The roots of the primary network are connected to the substation 
+    through high voltage lines.
+    """
+    
+    # Get associated secondary network
+    nodelabel = nx.get_node_attributes(primnet,'label')
+    edge_label = nx.get_edge_attributes(primnet,'label')
+    edge_r = nx.get_edge_attributes(primnet,'r')
+    edge_x = nx.get_edge_attributes(primnet,'x')
+    roots = [n for n in list(primnet.nodes()) if nodelabel[n]=='T']
+    secnodes = []
+    for t in roots: secnodes.extend(list(nx.descendants(master_secnet,t)))
+    
+    # Update secondary network data
+    secnet = master_secnet.subgraph(secnodes+roots)
+    dist_net = nx.Graph()
+    dist_net = nx.compose(dist_net,primnet)
+    dist_net = nx.compose(dist_net,secnet)
+    
+    # Label edges of the created network
+    nodepos = nx.get_node_attributes(dist_net,'cord')
+    sec_edge_label = {}
+    sec_edge_r = {}
+    sec_edge_x = {}
+    sec_edges = [e for e in list(secnet.edges())]
+    for e in sec_edges:
+        length = 1e-3 * MeasureDistance(nodepos[e[0]],nodepos[e[1]])
+        length = length if length != 0.0 else 1e-12
+        sec_edge_label[e] = 'S'
+        sec_edge_r[e] = 0.81508/57.6 * length
+        sec_edge_x[e] = 0.3496/57.6 * length
+    
+    # Update network attributes
+    edge_label.update(sec_edge_label)
+    edge_r.update(sec_edge_r)
+    edge_x.update(sec_edge_x)
+    nx.set_edge_attributes(dist_net, edge_label, 'label')
+    nx.set_edge_attributes(dist_net, edge_r, 'r')
+    nx.set_edge_attributes(dist_net, edge_x, 'x')
+    return dist_net
 
 
 #%% Classes
@@ -300,6 +392,8 @@ class Link(LineString):
             x,y = self.interpolate(i/length,normalized=True).xy
             xy = (x[0],y[0])
             points.append(xy)
+        if len(points)==0: 
+            points.append(Point((self.xy[0][0],self.xy[1][0])))
         return {i:[pt.x,pt.y] for i,pt in enumerate(MultiPoint(points))}
 
 
@@ -466,7 +560,7 @@ class Spider:
         return graph,transformers
     
     def generate_optimal_topology(self,link,minsep=50,penalty=0.5,followroad=False,
-                                  heuristic=None,hops=4):
+                                  heuristic=None,hops=4,tsfr_max=25,path=None):
         """
         Calls the MILP problem and solves it using gurobi solver.
         
@@ -483,7 +577,8 @@ class Spider:
         """
         graph,roots = self.create_dummy_graph(link,minsep,penalty,
                                               followroad=followroad,heuristic=heuristic)
-        edgelist = MILP_secondary(graph,roots).optimal_edges
+        edgelist = MILP_secondary(graph,roots,max_hop=hops,tsfr_max=tsfr_max,
+                                  grbpath=path).optimal_edges
         forest = nx.Graph()
         forest.add_edges_from(edgelist)
         node_cord = {node: roots[node] if node in roots\
@@ -522,41 +617,54 @@ class Primary:
     First the set of possible edges are identified from the links in road net-
     -work and transformer connections.
     """
-    def __init__(self,subdata,homes,master_graph,max_node=900,min_node=500):
+    def __init__(self,subdata,path,max_node=900):
         """
         """
         self.subdata = subdata
-        self.homes = homes
         self.graph = nx.Graph()
-        self.__get_subgraph(master_graph,max_node,min_node)
-        self.dist_net = nx.Graph()
+        self.__get_subgraph(path,max_node)
         return
     
-    def __get_subgraph(self,master_graph,max_node,min_node):
+    def __get_subgraph(self,path,max_node):
         """
         Get the subgraph of master graph from the nodes mapped to the Voronoi region
         of each substation. Thereafter, it calls the partioning function to create the
         partition of faster computation.
         Inputs:
-            master_graph: master graph from which the subgraph is to be extracted.
+            path: path where the master graph is stored.
         """
+        master_graph = read_master_graph(path,self.subdata.id)
         # Get and set attributes
         nodepos = nx.get_node_attributes(master_graph,'cord')
         length = {e:MeasureDistance(nodepos[e[0]],nodepos[e[1]]) \
                   for e in list(master_graph.edges())}
         nx.set_edge_attributes(master_graph,length,'length')
         
-        # Get the distance from the nearest substation
-        hvdist = {r:MeasureDistance(self.subdata.cord,nodepos[r]) \
-                  for r in self.subdata.nodes}
-        
-        graph = master_graph.subgraph(self.subdata.nodes)
-        nx.set_node_attributes(graph,hvdist,'distance')
-        
         # Create partitions
         print("Partitioning...")
-        self.__get_partitions(graph,max_node,min_node)
+        self.__get_partitions(master_graph,max_node)
         return
+    
+    
+    def __get_partitions(self,graph_list,max_node):
+        """
+        This function handles primary network creation for large number of nodes.
+        It divides the network into multiple partitions of small networks and solves
+        the optimization problem for each sub-network.
+        """
+        if type(graph_list) == nx.Graph: graph_list = [graph_list]
+        for g in graph_list:
+            if len(g) < max_node:
+                self.graph = nx.compose(self.graph,g)
+            else:
+                comp = nx.algorithms.community.girvan_newman(g)
+                nodelist = list(sorted(c) for c in next(comp))
+                sglist = [nx.subgraph(g,nlist) for nlist in nodelist]
+                print("Graph of ",len(g)," is partioned to",
+                      [len(sg) for sg in sglist])
+                self.__get_partitions(sglist,max_node)
+        return
+    
     
     def get_secondary(self,filename,roots):
         """
@@ -583,46 +691,9 @@ class Primary:
         nodelist = []
         for t in roots: nodelist.extend(list(nx.descendants(sec_net,t)))
         return list(sec_net.subgraph(nodelist+roots).edges())
+        
     
-    def __get_partitions(self,graph_list,max_node,min_node):
-        """
-        This function handles primary network creation for large number of nodes.
-        It divides the network into multiple partitions of small networks and solves
-        the optimization problem for each sub-network.
-        """
-        if type(graph_list) == nx.Graph: graph_list = [graph_list]
-        for g in graph_list:
-            if len(g) < max_node:
-                self.graph = nx.compose(self.graph,g)
-            else:
-                start = time.time()
-                edge_wt = nx.get_edge_attributes(g,'length')
-                edge_sorted = [k for k,_ in sorted(edge_wt.items(), 
-                                                   key=lambda item: item[1])][::-1]
-                for edge in edge_sorted:
-                    dummy = nx.Graph()
-                    dummy.add_edges_from([e for e in edge_wt])
-                    dummy.remove_edge(*edge)
-                    num_nodes = dummy.number_of_nodes()
-                    len_comp = [len(c) for c in list(nx.connected_components(dummy))]
-                    within_bds = [l for l in len_comp if num_nodes>l>=min_node]
-                    if len(within_bds)==len(len_comp):
-                        nodelist = [list(c) for c in list(nx.connected_components(dummy))]
-                        sglist = [nx.subgraph(g,nlist) for nlist in nodelist]
-                        break
-                    
-                # centers = nx.periphery(g)
-                # cells = nx.voronoi_cells(g, centers, 'length')
-                # nodelist = [cells[c] for c in centers]
-                # sglist = [nx.subgraph(g,nlist) for nlist in nodelist]
-                
-                end = time.time()
-                print("Graph of ",len(g)," is partioned to",
-                      [len(sg) for sg in sglist],"Time taken: ",end-start)
-                self.__get_partitions(sglist,max_node,min_node)
-        return
-    
-    def optimal_network(self,fmax=400,feedmax=10,opt=True):
+    def optimal_network(self,fmax=400,feedmax=10,grbpath=None):
         """
         Solve the MILP optimization problem to obtain the primary distribution with
         multiple feeders.
@@ -634,8 +705,13 @@ class Primary:
             agg_load = nx.get_node_attributes(subgraph,'load')
             nlabel = nx.get_node_attributes(subgraph,'label')
             dict_tsfr = {n:agg_load[n] for n in nodelist if nlabel[n]=='T'}
+            # adjust feeder count limit to avoid infeasibility 
+            net_load = sum(list(dict_tsfr.values()))/1000.0
+            if feedmax < int(net_load/fmax)+2:
+                feedmax = int(net_load/fmax)+2
+                print("Maximum feeder limit changed to:",feedmax)
             M = MILP_primary(subgraph,dict_tsfr,
-                             flow=fmax,feeder=feedmax,pf=opt)
+                             flow=fmax,feeder=feedmax,grbpath=grbpath)
             print("#####################Optimization Ended#####################")
             print("\n\n")
             primary += M.optimal_edges
@@ -644,85 +720,77 @@ class Primary:
         return primary,roots,tnodes
         
     
-    def get_sub_network(self,sec_file,flowmax=400,feedermax=10,opt_pf=True):
+    def get_sub_network(self,flowmax=400,feedermax=10,
+                        grbpath=None):
         """
         """
         # Optimizaton problem to get the primary network
         primary,roots,tnodes = self.optimal_network(fmax=flowmax,
-                                                    feedmax=feedermax,opt=opt_pf)            
-        
-        # Get the associated secondary distribution network
-        secondary = self.get_secondary(sec_file,tnodes)
+                                                    feedmax=feedermax,
+                                                    grbpath=grbpath)            
         
         # Add the first edge between substation and nearest road node
         hvlines = [(self.subdata.id,r) for r in roots]
         
         # Create the network with data as attributes
-        self.create_network(primary,secondary,hvlines)
-        return
+        dist_net = self.create_network(primary,hvlines)
+        return dist_net
     
-    def get_stochastic_network(self,sec_file,eprob):
+    
+    def get_partition_network(self,nodelist,flowmax=400,feedermax=10,
+                              grbpath=None):
         """
         """
-        # Optimizaton problem to get the primary network
-        unif = np.random.uniform(size=len(eprob))
-        primary =  [e for i,e in enumerate(list(eprob.keys())) if unif[i]<=eprob[e]]
+        subgraph = nx.subgraph(self.graph,nodelist)
+        agg_load = nx.get_node_attributes(subgraph,'load')
+        nlabel = nx.get_node_attributes(subgraph,'label')
+        dict_tsfr = {n:agg_load[n] for n in nodelist if nlabel[n]=='T'}
+        # adjust feeder count limit to avoid infeasibility 
+        net_load = sum(list(dict_tsfr.values()))/1000.0
+        if feedermax < int(net_load/flowmax)+2:
+            feedermax = int(net_load/flowmax)+2
+            print("Maximum feeder limit changed to:",feedermax)
+        M = MILP_primary(subgraph,dict_tsfr,
+                         flow=flowmax,feeder=feedermax,grbpath=grbpath)
+        print("#####################Optimization Ended#####################")
+        print("\n\n")
         
-        # Get the associated secondary distribution network
-        nlabel = nx.get_node_attributes(self.graph,'label')
-        ncord = nx.get_node_attributes(self.graph,'cord')
-        tnodes = [n for n in list(self.graph.nodes()) if nlabel[n]=='T']
-        secondary = self.get_secondary(sec_file,tnodes)
-        rcord = {n:ncord[n] for n in list(self.graph.nodes()) if n not in tnodes}
-        
-        # Add the first edge between substation and nearest road node
-        prim_net = nx.Graph()
-        prim_net.add_edges_from(primary)
-        hvlines = []
-        for nlist in list(nx.connected_components(prim_net)):
-            rnodes = [n for n in list(nlist) if n not in tnodes]
-            rdist = [MeasureDistance(self.subdata.cord,rcord[r]) for r in rnodes]
-            hvlines.append((self.subdata.id,rnodes[np.argmin(rdist)]))
-        
-        # Create the network with data as attributes
-        self.create_network(primary,secondary,hvlines)
-        return
+        # Get the primary, secondary and ehv line edges
+        primary = M.optimal_edges
+        hvlines = [(self.subdata.id,r) for r in M.roots]
+        dist_net = self.create_network(primary,hvlines)
+        return dist_net
     
-    def create_network(self,primary,secondary,hvlines):
+    
+    def create_network(self,primary,hvlines):
         """
         Create a network with the primary network and part of the associated secondary
         network. The roots of the primary network are connected to the substation 
         through high voltage lines.
         Input: 
             primary: list of edges forming the primary network
-            secondary: list of edges forming the associated secondary network
             hvlines: list of edges joining the roots of the primary network with the
             substation(s).
         """
-        # Combione both networks and update labels
-        self.dist_net.add_edges_from(hvlines+primary+secondary)
+        # Combine both networks and update labels
+        dist_net = nx.Graph()
+        dist_net.add_edges_from(hvlines+primary)
         
         # Add coordinate attributes to the nodes of the network.
         nodepos = nx.get_node_attributes(self.graph,'cord')
-        nodepos.update(self.homes.cord)
         nodepos[self.subdata.id] = self.subdata.cord
-        nx.set_node_attributes(self.dist_net,nodepos,'cord')
+        nx.set_node_attributes(dist_net,nodepos,'cord')
         
         # Label nodes of the created network
         node_label = nx.get_node_attributes(self.graph,'label')
-        node_label.update({h:'H' for h in self.homes.cord})
         node_label[self.subdata.id] = 'S'
-        nx.set_node_attributes(self.dist_net, node_label, 'label')
-        
-        node_load = {n:self.homes.average[n]*0.001 if node_label[n]=='H' else 0.0 \
-                for n in list(self.dist_net.nodes())}
-        nx.set_node_attributes(self.dist_net, node_load, 'load')
+        nx.set_node_attributes(dist_net, node_label, 'label')
         
         # Label edges of the created network
         edge_label = {}
         edge_r = {}
         edge_x = {}
-        for e in list(self.dist_net.edges()):
+        for e in list(dist_net.edges()):
             length = 1e-3 * MeasureDistance(nodepos[e[0]],nodepos[e[1]])
             length = length if length != 0.0 else 1e-12
             if e in primary or (e[1],e[0]) in primary:
@@ -737,10 +805,10 @@ class Primary:
                 edge_label[e] = 'S'
                 edge_r[e] = 0.81508/57.6 * length
                 edge_x[e] = 0.3496/57.6 * length
-        nx.set_edge_attributes(self.dist_net, edge_label, 'label')
-        nx.set_edge_attributes(self.dist_net, edge_r, 'r')
-        nx.set_edge_attributes(self.dist_net, edge_x, 'x')
-        return
+        nx.set_edge_attributes(dist_net, edge_label, 'label')
+        nx.set_edge_attributes(dist_net, edge_r, 'r')
+        nx.set_edge_attributes(dist_net, edge_x, 'x')
+        return dist_net
     
     
     
@@ -806,7 +874,7 @@ class Display:
                          ax=ax,node_size=size,node_color=colors,
                          edgelist=edgelist,edge_color=edge_color,width=edge_width)
         
-        ax.set_title("Distribution Network in Montgomery County",fontsize=30)
+        ax.set_title("Distribution Network in the County",fontsize=30)
         ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
         # ax.set_xlabel("Longitude",fontsize=20)
         # ax.set_ylabel("Latitude",fontsize=20)
@@ -894,7 +962,7 @@ class Display:
         nx.draw_networkx(self.dist_net, nodepos, ax=ax, node_color=colors,
             node_size=15, cmap=plt.cm.plasma, with_labels=False, vmin=0.85, vmax=1.05)
         cobj = cm.ScalarMappable(cmap='plasma')
-        cobj.set_clim(vmin=0.85,vmax=1.05)
+        cobj.set_clim(vmin=0.80,vmax=1.05)
         cbar = fig.colorbar(cobj,ax=ax)
         cbar.set_label('Voltage(pu)',size=30)
         cbar.ax.tick_params(labelsize=20)
@@ -932,7 +1000,7 @@ class Display:
         # edgelabel = nx.get_edge_attributes(self.dist_net,'label')
         colors = [flows[e] for e in edgelist]
         fmin = 0.2
-        fmax = 400.0
+        fmax = 800.0
         
         # Generate visual representation
         fig = plt.figure(figsize=(18,15))
@@ -954,7 +1022,7 @@ class Display:
         fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
         return colors
     
-    def plot_primary(self,homes,path,filename):
+    def plot_primary(self,path,filename):
         """
         Plots the generated synthetic distribution network with specific colors for
         primary and secondary networks and separate color for different nodes in the
@@ -962,8 +1030,6 @@ class Display:
         """
         # Delete the homes from graph
         graph = self.dist_net.copy()
-        for n in list(graph.nodes()):
-            if n in homes.cord: graph.remove_node(n)
         
         nodelist = list(graph.nodes())
         edgelist = list(graph.edges())
@@ -1012,10 +1078,8 @@ class Display:
                          ax=ax,node_size=size,node_color=colors,
                          edgelist=edgelist,edge_color=edge_color,width=edge_width)
         
-        ax.set_title("Distribution Network in Montgomery County",fontsize=30)
+        ax.set_title("Distribution Network in county",fontsize=30)
         ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
-        # ax.set_xlabel("Longitude",fontsize=20)
-        # ax.set_ylabel("Latitude",fontsize=20)
         
         # Define legends for the plot
         leglines = [Line2D([0], [0], color='black', markerfacecolor='black', marker='o',markersize=0),

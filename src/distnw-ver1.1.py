@@ -24,28 +24,30 @@ import datetime
 workPath = os.getcwd()
 inpPath = workPath + "/input/"
 libPath = workPath + "/Libraries/"
-csvPath = workPath + "/csv/"
+csvPath = workPath + "/csv/121-data/"
 figPath = workPath + "/figs/"
 tmpPath = workPath + "/temp/"
 
 sys.path.append(libPath)
-from pyExtractDatalib import Query
+from pyExtractDatalib import Query,getareas
 from pyBuildNetworklib import Spider
 from pyBuildNetworklib import MeasureDistance as dist
 
 
 #%% Initialization of data sets and mappings
+fiscode = '121'
 q_object = Query(csvPath,inpPath)
-homes,roads = q_object.GetDataset(fislist=[161,770,775])
+areas = getareas(inpPath,fiscode)
+homes,roads = q_object.GetDataset(fislist=areas)
 
-fiscode = '%03.f'%(161)
+
 df_hmap = pd.read_csv(csvPath+fiscode+'-home2link.csv')
 H2Link = dict([(t.hid, (t.source, t.target)) for t in df_hmap.itertuples()])
 spider_obj = Spider(homes,roads,H2Link)
 L2Home = spider_obj.link_to_home
 
 links = [l for l in L2Home if 0<len(L2Home[l])]
-# sys.exit(0)
+sys.exit(0)
 
 #%% Create secondary network
 import time
@@ -53,20 +55,26 @@ import time
 prefix = '51'+fiscode
 suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
 network = ''
-count = 5035942
+count = 5000001
 dict_tsfr = {}
 edgelist = []
 dict_time = {}
 
-for link in links:
+for link in links[1812:1813]:
     # initialize
     start_time = time.time()
     rename = {} # to rename the transformers with node IDs
     tsfrlist = [] # to list the transformers
     
     # Solve the optimization problem and generate forest
-    forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,
-                                                        followroad=True,heuristic=None)
+    if len(L2Home[link])>80:
+        print("HERE")
+        forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,hops=40,
+                                tsfr_max=60,followroad=True,heuristic=10,path=tmpPath)
+    else:
+        forest,roots = spider_obj.generate_optimal_topology(link,minsep=50,hops=10,
+                                tsfr_max=25,followroad=True,heuristic=None,path=tmpPath)
+    
     cord = nx.get_node_attributes(forest,'cord')
     load = nx.get_node_attributes(forest,'load')
     

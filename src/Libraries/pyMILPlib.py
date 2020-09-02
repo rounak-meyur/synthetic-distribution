@@ -54,11 +54,12 @@ def mycallback(model, where):
 class MILP_secondary:
     """
     """
-    def __init__(self,graph,roots):
+    def __init__(self,graph,roots,max_hop=10,tsfr_max=25,grbpath=None):
         """
         """
         suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
-        self.tmp = os.getcwd()+"/temp/gurobi/"+suffix+"-"
+        suffix = ''
+        self.tmp = grbpath+"gurobi/"+suffix+"-"
         self.edges = list(graph.edges())
         self.nodes = list(graph.nodes())
         print("Number of edges:",len(self.edges))
@@ -78,8 +79,8 @@ class MILP_secondary:
         self.model.ModelSense = grb.GRB.MINIMIZE
         self.__variables()
         self.__radiality()
-        self.__heuristic()
-        self.__powerflow()
+        self.__heuristic(M=max_hop)
+        self.__powerflow(M=tsfr_max)
         self.__objective()
         self.model.write(self.tmp+"secondary.lp")
         self.optimal_edges = self.__solve()
@@ -98,9 +99,6 @@ class MILP_secondary:
         self.z = self.model.addMVar(len(self.edges),
                                     vtype=grb.GRB.CONTINUOUS,
                                     lb=-grb.GRB.INFINITY,name='z')
-        # self.v = self.model.addMVar(len(self.nodes),
-        #                             vtype=grb.GRB.CONTINUOUS,
-        #                             lb=0.95,ub=1.00,name='v')
         self.model.update()
         return
     
@@ -136,11 +134,6 @@ class MILP_secondary:
         self.model.addConstr(self.A[self.hindex,:]@self.f == -self.p,name='balance')
         self.model.addConstr(self.f - M*self.x <= 0,name="flow_a")
         self.model.addConstr(self.f + M*self.x >= 0,name="flow_b")
-        # expr = r*np.diag(self.l)@self.f
-        # self.model.addConstr(self.A.T@self.v - expr - 0.1*(1-self.x) <= 0,name='va')
-        # self.model.addConstr(self.A.T@self.v - expr + 0.1*(1-self.x) >= 0,name='vb')
-        # for i in self.tindex:
-        #     self.model.addConstr(self.v[i]==1,name="voltage")
         self.model.update()
         return
     
@@ -155,7 +148,7 @@ class MILP_secondary:
         """
         """
         # Turn off display and heuristics
-        grb.setParam('OutputFlag', 1)
+        grb.setParam('OutputFlag', 0)
         grb.setParam('Heuristics', 0)
         
         # Open log file
@@ -191,13 +184,13 @@ class MILP_primary:
     network for covering a given set of local transformers through the edges of
     an existing road network.
     """
-    def __init__(self,graph,tnodes,flow=400,feeder=10, pf=True):
+    def __init__(self,graph,tnodes,flow=400,feeder=10, grbpath=None):
         """
         graph: the base graph which has the list of possible edges.
         tnodes: dictionary of transformer nodes with power consumption as value.
         """
-        suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
-        self.tmp = os.getcwd()+"/temp/gurobi/"+suffix+"-"
+        suffix = ''#datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
+        self.tmp = grbpath+"gurobi/"+suffix+"-"
         self.edges = list(graph.edges())
         self.nodes = list(graph.nodes())
         self.tindex = [i for i,n in enumerate(self.nodes) if n in tnodes]
@@ -216,7 +209,8 @@ class MILP_primary:
         self.model = grb.Model(name="Get Primary Network")
         self.model.ModelSense = grb.GRB.MINIMIZE
         self.__variables()
-        if pf: self.__powerflow()
+        self.__masterTree()
+        self.__powerflow()
         self.__radiality()
         self.__flowconstraint(M=flow)
         self.__connectivity()
@@ -229,8 +223,6 @@ class MILP_primary:
     
     def __variables(self):
         """
-        Create variable initialization for MILP such that x is binary, y is a 
-        binary variable and z is a continuous variable. 
         """
         print("Setting up variables")
         self.x = self.model.addMVar(len(self.edges),
@@ -245,6 +237,11 @@ class MILP_primary:
         self.v = self.model.addMVar(len(self.nodes),
                                     vtype=grb.GRB.CONTINUOUS,
                                     lb=0.9,ub=1.0,name='v')
+        self.t = self.model.addMVar(len(self.edges),
+                                    vtype=grb.GRB.BINARY,name='t')
+        self.g = self.model.addMVar(len(self.edges),
+                                    vtype=grb.GRB.CONTINUOUS,
+                                    lb=-grb.GRB.INFINITY,name='g')
         self.model.update()
         return
     
@@ -305,6 +302,18 @@ class MILP_primary:
         self.model.update()
         return
     
+    def __masterTree(self):
+        """
+        """
+        print("Setting up imaginary constraints for master solution")
+        M = len(self.nodes)
+        self.model.addConstr(self.A[1:,:]@self.g == np.ones(shape=(M-1,)))
+        self.model.addConstr(self.g - M*self.t <= 0)
+        self.model.addConstr(self.g + M*self.t >= 0)
+        self.model.addConstr(self.x <= self.t)
+        self.model.update()
+        
+    
     def __objective(self):
         """
         """
@@ -318,8 +327,8 @@ class MILP_primary:
         """
         """
         # Turn off display and heuristics
-        grb.setParam('OutputFlag', 1)
-        grb.setParam('Heuristics', 1)
+        grb.setParam('OutputFlag', 0)
+        grb.setParam('Heuristics', 0)
         
         # Open log file
         logfile = open(self.tmp+'gurobi.log', 'w')
