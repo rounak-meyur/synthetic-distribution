@@ -2,4 +2,5 @@ src/temp/
 src/csv/
 src/input/
 src/figs
+src/validate
 src/Libraries/__pycache__
