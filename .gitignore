@@ -3,6 +3,9 @@ primnet/figs
 primnet/out
 secnet/out
 secnet/.ipynb_checkpoints
+primnet/.ipynb_checkpoints
+validate/.ipynb_checkpoints
+libs/.ipynb_checkpoints
 input
 validate/figs
 libs/__pycache__
