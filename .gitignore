@@ -1,6 +1,8 @@
-src/temp/
-src/csv/
-src/input/
-src/figs
-src/validate
-src/Libraries/__pycache__
+ensemble/figs
+primnet/figs
+primnet/out
+secnet/figs
+secnet/out
+input
+validate/figs
+libs/__pycache__
