@@ -1,8 +1,8 @@
 ensemble/figs
 primnet/figs
 primnet/out
-secnet/figs
 secnet/out
+secnet/.ipynb_checkpoints
 input
 validate/figs
 libs/__pycache__

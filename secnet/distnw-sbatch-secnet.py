@@ -58,13 +58,13 @@ for link in links:
     start_time = time.time()
     if len(L2Home[link])>150: 
         forest,roots = secnet_obj.generate_optimal_topology(link,minsep=50,hops=80,
-                                tsfr_max=100,followroad=True,heuristic=5,path=tmpPath)
+                                tsfr_max=100,heuristic=5,path=tmpPath)
     elif len(L2Home[link])>80: 
         forest,roots = secnet_obj.generate_optimal_topology(link,minsep=50,hops=40,
-                                tsfr_max=60,followroad=True,heuristic=15,path=tmpPath)
+                                tsfr_max=60,heuristic=15,path=tmpPath)
     else:
         forest,roots = secnet_obj.generate_optimal_topology(link,minsep=50,hops=10,
-                                tsfr_max=25,followroad=True,heuristic=None,path=tmpPath)
+                                tsfr_max=25,heuristic=None,path=tmpPath)
     end_time = time.time()
     
     # Additional network data
