@@ -1,7 +1,7 @@
 
 ## Operational Validation
 In order to validate the generated synthetic networks, we obtained some regional power distribution networks from a distribution company. We compare the voltages at the residences when they are connected to the actual and synthetic network in Fig.~\ref{fig:validate-voltage-flow}. We call this *operational validity*: The basic idea is that if we substitute the actual network with the synthetic network, we should see minimal node voltage differences between the two. Here, the green lines signify $\pm1\%$ deviation from the voltages if the residences had been connected to the actual network. We observe that the residence voltages in the synthetic network remain within this $\pm1\%$ regulation, which validates our generated synthetic network. We also compare the edge flows in the two networks through the histogram in the following figure. Since the networks are radial in structure, the edge flows is proportional to the number of children nodes. The structural differences in the two networks explain the observed deviation in the edge flows of the networks.
-![png](figs/voltage-comparison.png) | ![png](figs/flow-comparison.png)
+![png](figs/voltage-comparison.png) ![png](figs/flow-comparison.png)
 
 ## Structural Validation
 In this section, we perform a visual comparison of the generated synthetic network to the actual network covering the same geographical region. At first sight, the two networks are adjacent to and almost overlap each other. The inset figure confirms this hypothesis. 
@@ -17,7 +17,8 @@ First, we compare the distribution of nodes in each network. The percentage of t
     \mathcal{M}^{(N)}_{ij}=\dfrac{\dfrac{|\mathscr{V}^{ij}_{act}|}{|\mathscr{V}_{act}|}-\dfrac{|\mathscr{V}^{ij}_{syn}|}{|\mathscr{V}_{syn}|}}{\dfrac{|\mathscr{V}^{ij}_{act}|}{|\mathscr{V}_{act}|}}\times 100
 \end{equation}
 The above metric can be used to denote the percentage deviation in the distribution of nodes in each rectangular grid. The following figure shows two separate grid resolutions and spatial comparison of node distribution for each resolution. The color code denotes the intensity of the percentage deviation in the distribution. Note that for some grids, the actual network data might be missing. In such cases, the comparison is not done and the grid is colored white. We notice that for most of the rectangular grids, the percentage deviation in the node distribution is fairly small. The large deviations observed at the bottom right and top right corners are primarily due to the absence of actual network data for those grids.
-<img src="figs/spatial-comparison-5-5.png" width="100"/> <img src="figs/spatial-comparison-7-7.png" width="100"/>
+
+<img src="figs/spatial-comparison-5-5.png" width="200"/> <img src="figs/spatial-comparison-7-7.png" width="200"/>
 
 #### Comparison of network length
 We compare the network lengths in miles for each network. The percentage deviation is an indicator of the structural dissimilarities of the networks. Therefore, we use the following metric to compare the lengths of the induced network for the grid along the $i^{th}$ row and $j^{th}$ column.
