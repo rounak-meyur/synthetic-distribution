@@ -18,7 +18,7 @@ First, we compare the distribution of nodes in each network. The percentage of t
 \end{equation}
 The above metric can be used to denote the percentage deviation in the distribution of nodes in each rectangular grid. The following figure shows two separate grid resolutions and spatial comparison of node distribution for each resolution. The color code denotes the intensity of the percentage deviation in the distribution. Note that for some grids, the actual network data might be missing. In such cases, the comparison is not done and the grid is colored white. We notice that for most of the rectangular grids, the percentage deviation in the node distribution is fairly small. The large deviations observed at the bottom right and top right corners are primarily due to the absence of actual network data for those grids.
 
-<img src="figs/spatial-comparison-5-5.png" width="200"/> <img src="figs/spatial-comparison-7-7.png" width="200"/>
+<img src="figs/spatial-comparison-5-5.png" width="450"/> <img src="figs/spatial-comparison-7-7.png" width="450"/>
 
 #### Comparison of network length
 We compare the network lengths in miles for each network. The percentage deviation is an indicator of the structural dissimilarities of the networks. Therefore, we use the following metric to compare the lengths of the induced network for the grid along the $i^{th}$ row and $j^{th}$ column.
