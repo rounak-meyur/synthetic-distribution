@@ -230,7 +230,7 @@ class Validate:
                 'synthetic':synth_graph}
         return data
 
-    def compare_networks(self,ax,df_lines,df_buses,sgraph):
+    def compare_networks(self,ax,df_lines,df_buses,sgraph,legend=True):
         """
         Compares the actual and synthetic networks visually.
         """
@@ -266,7 +266,7 @@ class Validate:
                      'Synthetic distribution network']
             
         # Legends
-        ax.legend(leglines,leglabels,loc='best',ncol=1,prop={'size': 8})
+        if legend: ax.legend(leglines,leglabels,loc='best',ncol=1,prop={'size': 8})
         ax.tick_params(bottom=False,left=False,labelleft=False,labelbottom=False)
         return
     
@@ -521,7 +521,7 @@ class Validate:
     
     def compare_length(self,nX,nY,path):
         """
-        
+        Compares the length of the two networks in miles.
 
         Parameters
         ----------
@@ -611,26 +611,18 @@ class Validate:
                     'percent-length-comparison-'+str(nX)+'-'+str(nY)),
                     bbox_inches='tight')
         return
+
     
     
-
-
-
 #%% Statistical comparisons
 
 
 
-def to_percent(y, position):
-    # Ignore the passed in position. This has the effect of scaling the default
-    # tick locations.
-    s = "{0:.1f}".format(100*y)
-    return s
 
 
 
 
-
-def hop_density(graph_list,sub):
+def plot_hop_density():
     """
     """
     # nodelabel = nx.get_node_attributes(graph,'label')
@@ -638,50 +630,3 @@ def hop_density(graph_list,sub):
         h = [nx.shortest_path_length(g,n,sub) for n in list(g.nodes())]
         sns.distplot(h,hist=False,kde=True,kde_kws = {'shade': False, 'linewidth': 2})
     return
-
-
-# def hop_dist(self,path,fname=None,name1='Synthetic Network',
-    #          name2='Original Network'):
-    #     """
-    #     Creates the hop distribution of the networks. The synthetic network is compared
-    #     with a base network. The hop distribution of both the networks is plotted 
-    #     together in a stacked plot/histogram.
-        
-    #     Inputs: graph: synthetic network graph
-    #             base: original network graph
-    #             sub: substation ID
-    #             path: path to save the plot
-    #     """
-    #     for area in self.area_data:
-            
-    #         synth = self.area_data[area]['synthetic']
-    #         act = self.area_data[area]['actual']
-    #         h1 = [nx.shortest_path_length(graph,n,sub) for n in list(graph.nodes())]
-    #         w1 = np.ones_like(h1)/float(len(h1))
-    #         h2 = [nx.shortest_path_length(base,n,111) for n in list(base.nodes())]
-    #         w2 = np.ones_like(h2)/float(len(h2))
-    #     hops = [h1,h2]
-    #     w = [w1,w2]
-    #     bins = range(0,80,2)
-    #     colors = ['lightsalmon','turquoise']
-    #     labels = [name1,name2]
-    #     fig = plt.figure(figsize=(10,6))
-    #     ax = fig.add_subplot(111)
-    #     ax.hist(hops,bins=bins,weights=w,label=labels,color=colors)
-    #     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
-    #     ax.set_ylabel("Percentage of nodes",fontsize=20)
-    #     ax.set_xlabel("Hops from root node",fontsize=20)
-    #     ax.legend(prop={'size': 20})
-    #     ax.tick_params(axis='both', labelsize=20)
-    #     if fname == None:
-    #         ax.set_title("Hop distribution comparison for network rooted at "+str(sub),
-    #                      fontsize=20)
-    #     elif fname=='compare':
-    #         ax.set_title("Hop distribution for two generated synthetic networks",
-    #                      fontsize=20)
-        
-    #     # Save the figure
-    #     if fname==None:filename = str(sub)+'-hop-dist'
-    #     else: filename=fname
-    #     fig.savefig("{}{}.png".format(path,filename),bbox_inches='tight')
-    #     return
