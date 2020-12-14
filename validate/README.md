@@ -26,7 +26,8 @@ We compare the network lengths in miles for each network. The percentage deviati
     \mathcal{M}^{(L)}_{ij}=\dfrac{\sum_{e\in\mathscr{E}^{ij}_{act}}l_e-\sum_{e\in\mathscr{E}^{ij}_{syn}}l_e}{\sum_{e\in\mathscr{E}^{ij}_{act}}l_e}\times 100
 \end{equation}
 where $l_e$ is the length of the edge in miles. The above metric can be used to denote the percentage deviation in the network lengths in each rectangular grid. The following figure shows two separate grid resolutions and spatial comparison of network lengths for each resolution. The color code denotes the intensity of the percentage deviation. Note that for some grids, the actual network data might be missing. In such cases, the comparison is not done and the grid is colored white. The two networks are visually seen to almost overlap each other. Therefore, it is expected that the overall length of the networks would be fairly similar to each other. We observe that for the majority of the rectangular grids, the percentage deviation in the network lengths is fairly small.
-![png](figs/percent-length-comparison-5-5.png) | ![png](figs/percent-length-comparison-7-7.png)
+
+<img src="figs/percent-length-comparison-5-5.png" width="450"/> <img src="figs/percent-length-comparison-7-7.png" width="450"/>
 
 #### Comparison of graphlets/motifs
 We consider graphlets/motifs in each network and compare their respective distributions. For example, we consider two graphlets of (i) four node chains and (ii) 7 node star shaped graphlet as shown in the following figure. For each rectangular grid, we compare the distribution of these 4 and 7 node graphlets/motifs and plot the deviation in the spatial distribution.
@@ -36,17 +37,22 @@ We use the following expression for computing the percentage deviation.
     \mathcal{M}^{(M)}_{ij}=\dfrac{\dfrac{n^{ij}_{act}}{n_{act}}-\dfrac{n^{ij}_{syn}}{n_{syn}}}{\dfrac{n^{ij}_{act}}{n_{act}}}\times 100
 \end{equation}
 where $n_{act}$ and $n_{syn}$ are the total number of such motifs in the entire actual and synthetic networks respectively. The number of motifs in the grid along the $i^{th}$ row and $j^{th}$ column for either network are denoted by $n_{act}^{ij}$ and $n_{syn}^{ij}$. Note that the 4-node chain motifs are more common in the network than the 7-node star motifs. From the results, it is seen that the considered motifs (4-node chain and 7-node star) are almost equally distributed in the two networks.
-![png](figs/4-motif-comparison-graphlet-5-5.png) | ![png](figs/4-motif-comparison-graphlet-7-7.png)
-![png](figs/7-motif-comparison-graphlet-10-10.png) | ![png](figs/7-motif-comparison-graphlet-15-15.png)
+
+<img src="figs/4-motif-comparison-graphlet-5-5.png" width="450"/> <img src="figs/4-motif-comparison-graphlet-7-7.png" width="450"/>
+
+<img src="figs/7-motif-comparison-graphlet-10-10.png" width="450"/> <img src="figs/7-motif-comparison-graphlet-15-15.png" width="450"/>
 
 #### Degree Distribution
 We consider three separate sections of the two networks and compare the degree distribution for each section. We observe that the two distributions match each other very closely. We observe that the degree of the nodes ranges between $1$ and $4$ for either networks and the degree distribution shows that majority of nodes have a degree of $2$. This is also confirmed by our results where we compare the distribution of chain motifs in the networks.
-![png](figs/degree-distribution-194.png) | ![png](figs/degree-distribution-9001.png) | ![png](figs/degree-distribution-7001.png)
+
+<img src="figs/degree-distribution-194.png" width="300"/> <img src="figs/degree-distribution-9001.png" width="300"/> <img src="figs/degree-distribution-7001.png" width="300"/>
 
 #### Hop Distribution
 Next, we consider the hop distribution for the networks. This is an important analysis given the forest of tree structure of the networks. In this analysis we study how the nodes in each network are distributed around the root node. First, we compare the number of edges between each node and the root node or feeder node. We observe that the hop distribution almost follows a similar distribution to the edge flows which is shown in the beginning of this section. We have shown earlier that even though the spatial distribution of nodes in the networks are similar, the number of nodes in each network is different. Therefore, we consider the percentage of nodes at each hop rather than the absolute number of nodes for the comparison.
-![png](figs/hop-dist-194.png) | ![png](figs/hop-dist-9001.png) | ![png](figs/hop-dist-7001.png)
+
+<img src="figs/hop-dist-194.png" width="300"/> <img src="figs/hop-dist-9001.png" width="300"/> <img src="figs/hop-dist-7001.png" width="300"/>
 
 #### Reach Distribution
 A better comparison would be the \emph{reach distribution} of each network where we compare how far (in meters) are the nodes in each network located from the root or feeder node. An interesting observation is that the actual network consists a large number of long edges. This is primarily because of the fact that the network has been built over multiple years as the population grew in the geographical location. However, the synthetic networks are generated using first principles and as an output of an optimization problem where the generated network has the minimum length (or requires minimal installation and maintenance cost).
-![png](figs/reach-dist-194.png) | ![png](figs/reach-dist-9001.png) | ![png](figs/reach-dist-7001.png)
+
+<img src="figs/reach-dist-194.png" width="300"/> <img src="figs/reach-dist-9001.png" width="300"/> <img src="figs/reach-dist-7001.png" width="300"/>
