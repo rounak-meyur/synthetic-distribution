@@ -1,11 +1,13 @@
 
 ## Operational Validation
 In order to validate the generated synthetic networks, we obtained some regional power distribution networks from a distribution company. We compare the voltages at the residences when they are connected to the actual and synthetic network in the following figure. We call this *operational validity*: The basic idea is that if we substitute the actual network with the synthetic network, we should see minimal node voltage differences between the two. Here, the green lines signify $\pm1\%$ deviation from the voltages if the residences had been connected to the actual network. We observe that the residence voltages in the synthetic network remain within this $\pm1\%$ regulation, which validates our generated synthetic network. We also compare the edge flows in the two networks through the histogram in the following figure. Since the networks are radial in structure, the edge flows is proportional to the number of children nodes. The structural differences in the two networks explain the observed deviation in the edge flows of the networks.
-![png](figs/voltage-comparison.png) ![png](figs/flow-comparison.png)
+
+<img src="figs/voltage-comparison.png" width="450"/> <img src="figs/flow-comparison.png" width="450"/>
 
 ## Structural Validation
 In this section, we perform a visual comparison of the generated synthetic network to the actual network covering the same geographical region. At first sight, the two networks are adjacent to and almost overlap each other. The inset figure confirms this hypothesis. 
-![png](figs/structure-comparison.png)
+
+<img src="figs/structure-comparison.png" width="950"/>
 
 
 ## Statistical Validation
