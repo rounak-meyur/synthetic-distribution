@@ -270,7 +270,7 @@ class Validate:
         ax.tick_params(bottom=False,left=False,labelleft=False,labelbottom=False)
         return
     
-    def get_partitions(self,nX,nY):
+    def get_partitions(self,nX,nY,xdelta=0.0,ydelta=0.0):
         """
         Generates partitions in the geographical region and returns the grids. 
 
@@ -296,23 +296,25 @@ class Validate:
         
         # Partition into required areas
         xmin = []; xmax = []; ymin = []; ymax = []
+        x_shift = xdelta*(RIGHT-LEFT)
+        y_shift = ydelta*(TOP-BOTTOM)
         for t in range(nX):
-            xmin.append(LEFT+(t/nX)*(RIGHT-LEFT))
-            xmax.append(LEFT+((1+t)/nX)*(RIGHT-LEFT))
+            xmin.append(LEFT+(t/nX)*(RIGHT-LEFT)+x_shift)
+            xmax.append(LEFT+((1+t)/nX)*(RIGHT-LEFT)+x_shift)
         for t in range(nY):
-            ymin.append(BOTTOM+(t/nY)*(TOP-BOTTOM))
-            ymax.append(BOTTOM+((1+t)/nY)*(TOP-BOTTOM))
+            ymin.append(BOTTOM+(t/nY)*(TOP-BOTTOM)+y_shift)
+            ymax.append(BOTTOM+((1+t)/nY)*(TOP-BOTTOM)+y_shift)
         LIMITS = (LEFT,RIGHT,BOTTOM,TOP)
         GRID = (xmin,xmax,ymin,ymax)
         return LIMITS,GRID
 
 
-    def node_stats(self,nX,nY,path):
+    def node_stats(self,nX,nY,path,xdelta=0.0,ydelta=0.0):
         """
         Plots the spatial statistical distribution of nodes in a geographical 
         region. 
         """
-        LIMITS,GRID = self.get_partitions(nX,nY)
+        LIMITS,GRID = self.get_partitions(nX,nY,xdelta=xdelta,ydelta=ydelta)
         (LEFT,RIGHT,BOTTOM,TOP) = LIMITS
         (xmin,xmax,ymin,ymax) = GRID
         
@@ -371,7 +373,7 @@ class Validate:
         
         # Save figure
         fig.savefig("{}{}.png".format(path,
-                    'spatial-comparison-'+str(nX)+'-'+str(nY)),
+                    'spatial-comparison-'+str(nX)+'-'+str(nY)+'-xs-'+str(int(xdelta*100))+'-ys-'+str(int(ydelta*100))),
                     bbox_inches='tight')
         return
 
@@ -622,11 +624,11 @@ class Validate:
 
 
 
-def plot_hop_density():
-    """
-    """
-    # nodelabel = nx.get_node_attributes(graph,'label')
-    for g in graph_list:
-        h = [nx.shortest_path_length(g,n,sub) for n in list(g.nodes())]
-        sns.distplot(h,hist=False,kde=True,kde_kws = {'shade': False, 'linewidth': 2})
-    return
+# def plot_hop_density():
+#     """
+#     """
+#     # nodelabel = nx.get_node_attributes(graph,'label')
+#     for g in graph_list:
+#         h = [nx.shortest_path_length(g,n,sub) for n in list(g.nodes())]
+#         sns.distplot(h,hist=False,kde=True,kde_kws = {'shade': False, 'linewidth': 2})
+#     return

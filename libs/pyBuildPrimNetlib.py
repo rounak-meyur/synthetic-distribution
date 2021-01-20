@@ -87,7 +87,37 @@ def mycallback(model, where):
             model.terminate()
     return
 
-#%% Classes    
+#%% Classes
+class Link(LineString):
+    """
+    Derived class from Shapely LineString to compute metric distance based on 
+    geographical coordinates over geometric coordinates.
+    """
+    def __init__(self,line_geom):
+        """
+        """
+        super().__init__(line_geom)
+        self.geod_length = self.__length()
+        return
+    
+    
+    def __length(self):
+        '''
+        Computes the geographical length in meters between the ends of the link.
+        '''
+        if self.geom_type != 'LineString':
+            print("Cannot compute length!!!")
+            return None
+        # Compute great circle distance
+        geod = Geodesic.WGS84
+        length = 0.0
+        for i in range(len(list(self.coords))-1):
+            lon1,lon2 = self.xy[0][i:i+2]
+            lat1,lat2 = self.xy[1][i:i+2]
+            length += geod.Inverse(lat1, lon1, lat2, lon2)['s12']
+        return length
+
+
 class MILP_primary:
     """
     Contains methods and attributes to generate the optimal primary distribution
@@ -375,29 +405,36 @@ class Primary:
         edge_label = {}
         edge_r = {}
         edge_x = {}
+        glength = {}
         for e in list(dist_net.edges()):
             length = 1e-3 * MeasureDistance(nodepos[e[0]],nodepos[e[1]])
             length = length if length != 0.0 else 1e-12
             if e in primary or (e[1],e[0]) in primary:
-                edge_geom[e] = LineString((nodepos[e[0]],nodepos[e[1]]))
+                edge_geom[e] = Link((nodepos[e[0]],nodepos[e[1]]))
                 edge_label[e] = 'P'
                 edge_r[e] = 0.8625/39690 * length
                 edge_x[e] = 0.4154/39690 * length
+                glength[e] = edge_geom[e].geod_length
             elif e in hvlines or (e[1],e[0]) in hvlines:
                 rnode = e[0] if e[1]==self.subdata.id else e[1]
                 path_cords = [self.subdata.cord]+\
                                    [nodepos[nd] for nd in feed_path[rnode]]
-                edge_geom[e] = LineString(path_cords)
+                edge_geom[e] = Link(path_cords)
                 edge_label[e] = 'E'
                 edge_r[e] = 1e-12 * length
                 edge_x[e] = 1e-12 * length
+                glength[e] = edge_geom[e].geod_length
             else:
-                edge_geom[e] = LineString((nodepos[e[0]],nodepos[e[1]]))
+                edge_geom[e] = Link((nodepos[e[0]],nodepos[e[1]]))
                 edge_label[e] = 'S'
                 edge_r[e] = 0.81508/57.6 * length
                 edge_x[e] = 0.3496/57.6 * length
+                glength[e] = edge_geom[e].geod_length
         nx.set_edge_attributes(dist_net, edge_geom, 'geometry')
         nx.set_edge_attributes(dist_net, edge_label, 'label')
         nx.set_edge_attributes(dist_net, edge_r, 'r')
         nx.set_edge_attributes(dist_net, edge_x, 'x')
+        nx.set_edge_attributes(dist_net,glength,'geo_length')
         return dist_net
+    
+
