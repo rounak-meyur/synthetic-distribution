@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from collections import namedtuple as nt
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.lines import Line2D
 
 #%% Geometry of Primary Network
@@ -63,7 +64,7 @@ class Link(LineString):
         return length
     
 #%% Primary Network Data
-def GetSynthNet(path,code):
+def GetPrimNet(path,code):
     """
     Read the txt file containing the edgelist of the generated synthetic network and
     generates the corresponding networkx graph. The graph has the necessary node and
@@ -77,21 +78,24 @@ def GetSynthNet(path,code):
         graph: networkx graph
         node attributes of graph:
             cord: longitude,latitude information of each node
-            load: load for each node for consumers, otherwise it is 0.0
             label: 'H' for home, 'T' for transformer, 'R' for road node, 'S' for subs
         edge attributes of graph:
             label: 'P' for primary, 'S' for secondary, 'E' for feeder lines
             r: resistance of edge
             x: reactance of edge
     """
-    graph = nx.Graph()
-    for c in code:
-        g = nx.read_gpickle(path+str(c)+'-prim-dist.gpickle')
-        graph = nx.compose(graph,g)
+    graph = nx.read_gpickle(path+str(code)+'-prim-dist.gpickle')
+    sgeom = nx.get_edge_attributes(graph,'geometry')
+    synthgeom = {e:Link(sgeom[e]) for e in sgeom}
+    glength = {e:synthgeom[e].geod_length for e in sgeom}
+    nx.set_edge_attributes(graph,glength,'geo_length')
     return graph
 
 #%% Combine primary and secondary networks
 def GetSecnet(path,areas):
+    """
+    NEED TO UPDATE THE CODE TO HANDLE LINK AND LINESTRING ERROR
+    """
     # Extract the secondary network data from all areas
     nodelabel = {}
     nodepos = {}
@@ -118,9 +122,9 @@ def GetSecnet(path,areas):
             length = length if length != 0.0 else 1e-12
             edger[(n1,n2)] = 0.81508/57.6 * length
             edgex[(n1,n2)] = 0.3496/57.6 * length
-            edgegeom[(n1,n2)] = Link((nodepos[n1],nodepos[n2]))
+            edgegeom[(n1,n2)] = LineString((nodepos[n1],nodepos[n2]))
             edgelabel[(n1,n2)] = 'S'
-            glength[(n1,n2)] = edgegeom[(n1,n2)].geod_length
+            glength[(n1,n2)] = Link(edgegeom[(n1,n2)]).geod_length
     # Construct the graph
     secnet = nx.Graph()
     secnet.add_edges_from(edgelist)
@@ -298,8 +302,8 @@ def plot_network(net,inset,path,with_secnet=False):
     return
 
 
-def color_nodes(net,voltage,inset,path):
-    fig = plt.figure(figsize=(30,30),dpi=72)
+def color_nodes(net,inset,path):
+    fig = plt.figure(figsize=(35,30),dpi=72)
     ax = fig.add_subplot(111)
     
     # Draw edges
@@ -308,17 +312,16 @@ def color_nodes(net,voltage,inset,path):
     # Draw nodes
     d = {'nodes':net.nodes(),
          'geometry':[Point(net.nodes[n]['cord']) for n in net.nodes()],
-         'voltage':[voltage[e] for e in net.nodes()]}
+         'voltage':[net.nodes[n]['voltage'] for n in net.nodes()]}
     df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_nodes.plot(ax=ax,column='voltage',markersize=2.0,cmap=cm.plasma)
-    
-    # Colorbar
-    cobj = cm.ScalarMappable(cmap='plasma')
-    cobj.set_clim(vmin=0.80,vmax=1.05)
-    cbar = fig.colorbar(cobj,ax=ax)
-    cbar.set_label('Voltage(pu)',size=30)
-    cbar.ax.tick_params(labelsize=20)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.001)
+    df_nodes.plot(ax=ax,column='voltage',markersize=40.0,cmap=cm.plasma,
+                  vmin=0.80,vmax=1.05,cax=cax,legend=True)
+    cax.set_ylabel("Voltage(in pu)",fontsize=30)
+    cax.tick_params(labelsize=20)
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+    
     
     # Inset figures
     for sub in inset:
@@ -331,9 +334,11 @@ def color_nodes(net,voltage,inset,path):
         d = {'nodes':inset[sub]['graph'].nodes(),
              'geometry':[Point(inset[sub]['graph'].nodes[n]['cord']) \
                          for n in inset[sub]['graph'].nodes()],
-             'voltage':[voltage[n] for n in inset[sub]['graph'].nodes()]}
+             'voltage':[inset[sub]['graph'].nodes[n]['voltage'] \
+                        for n in inset[sub]['graph'].nodes()]}
         df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-        df_nodes.plot(ax=axins,column='voltage',markersize=2.0,cmap=cm.plasma)
+        df_nodes.plot(ax=axins,column='voltage',markersize=30.0,cmap=cm.plasma,
+                      vmin=0.80,vmax=1.05)
         axins.tick_params(bottom=False,left=False,
                           labelleft=False,labelbottom=False)
         mark_inset(ax, axins, loc1=inset[sub]['loc1'], loc2=inset[sub]['loc2'], 
@@ -342,7 +347,7 @@ def color_nodes(net,voltage,inset,path):
     return
 
 
-def color_edges(net,flows,inset,path):
+def color_edges(net,inset,path):
     fig = plt.figure(figsize=(30,30),dpi=72)
     ax = fig.add_subplot(111)
     
@@ -352,17 +357,15 @@ def color_edges(net,flows,inset,path):
     # Draw edges
     d = {'edges':net.edges(),
          'geometry':[net[e[0]][e[1]]['geometry'] for e in net.edges()],
-         'flows':[flows[e] for e in net.edges()]}
+         'flows':[np.exp(net[e[0]][e[1]]['flow']) for e in net.edges()]}
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_edges.plot(column='flows',ax=ax,cmap=cm.plasma)
-    
-    # Colorbar
     fmin = 0.2; fmax = 800.0
-    cobj = cm.ScalarMappable(cmap='plasma')
-    cobj.set_clim(vmin=fmin,vmax=fmax)
-    cbar = fig.colorbar(cobj,ax=ax)
-    cbar.set_label('Flow along edge in kVA',size=30)
-    cbar.ax.tick_params(labelsize=20)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.001)
+    df_edges.plot(column='flows',ax=ax,cmap=cm.plasma,vmin=fmin,vmax=fmax,
+                  cax=cax,legend=True)
+    cax.set_ylabel('Flow along edge in kVA',size=30)
+    cax.tick_params(labelsize=20)
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
     
     # Inset figures
@@ -374,8 +377,10 @@ def color_edges(net,flows,inset,path):
         DrawNodes(inset[sub]['graph'],axins,label=['S','T','R','H'],
                   color='black',size=2.0)
         d = {'edges':inset[sub]['graph'].edges(),
-             'geometry':[inset[sub]['graph'][e[0]][e[1]]['geometry'] for e in net.edges()],
-             'flows':[flows[e] for e in net.edges()]}
+             'geometry':[inset[sub]['graph'][e[0]][e[1]]['geometry'] \
+                         for e in inset[sub]['graph'].edges()],
+             'flows':[np.exp(inset[sub]['graph'][e[0]][e[1]]['flow']) \
+                      for e in inset[sub]['graph'].edges()]}
         df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
         df_edges.plot(column='flows',ax=axins,cmap=cm.plasma)
         axins.tick_params(bottom=False,left=False,
