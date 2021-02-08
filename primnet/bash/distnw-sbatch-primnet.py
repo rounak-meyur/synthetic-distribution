@@ -21,7 +21,7 @@ workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
 from pyExtractDatalib import GetSubstations
-from pyBuildPrimNetlib import Primary
+from pyBuildPrimNetlib import Primary,powerflow
 
 
 
@@ -46,9 +46,11 @@ sub_data = substation(id=sub,cord=subs.cord[sub])
 # Generate primary distribution network by partitions
 start_time = time.time()
 P = Primary(sub_data,tmpPath)
-prim_net,dummy_net = P.get_sub_network(grbpath=tmpPath)
+print("Master graph loaded and partitioned")
+prim_net = P.get_sub_network(grbpath=tmpPath)
 end_time = time.time()
 time_taken = end_time - start_time
+prim_net = powerflow(prim_net)
 with open(tmpPath+'prim-time.txt','a') as f:
     f.write(sys.argv[1]+'\t'+str(time_taken)+'\n')
 
@@ -59,4 +61,3 @@ except:
     print("No cycles found!!!")
 
 nx.write_gpickle(prim_net,tmpPath+'prim-network/'+str(sub)+'-prim-dist.gpickle')
-nx.write_gpickle(dummy_net,tmpPath+'prim-network/'+str(sub)+'-prim-dummy.gpickle')

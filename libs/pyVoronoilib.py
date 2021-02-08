@@ -86,7 +86,11 @@ def create_master_graph(roads,tsfr,links):
     
     roads:
         TYPE: namedtuple
-        DESCRIPTION: 
+        DESCRIPTION: road network data
+    tsfr:
+        TYPE: namedtuple
+        DESCRIPTION: local transformer data
+    
     """
     road_edges = list(roads.graph.edges())
     tsfr_edges = list(tsfr.graph.edges())
@@ -117,6 +121,11 @@ def create_master_graph(roads,tsfr,links):
     node_load = {n:tsfr.load[n] if node_label[n]=='T' else 0.0 \
                  for n in list(graph.nodes())}
     nx.set_node_attributes(graph,node_load,'load')
+    
+    # Add the associated secondary network for each local transformer
+    sec_net = {n:tsfr.secnet[n] if node_label[n]=='T' else nx.Graph() \
+                 for n in list(graph.nodes())}
+    nx.set_node_attributes(graph,sec_net,'secnet')
     return graph
 
 def get_nearest_road(subs,graph):

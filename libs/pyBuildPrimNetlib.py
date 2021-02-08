@@ -10,6 +10,7 @@ from shapely.geometry import LineString
 import networkx as nx
 import gurobipy as grb
 import numpy as np
+from math import log
 
 
 #%% Functions
@@ -49,6 +50,39 @@ def read_master_graph(path,sub):
             length: geodesic length of the edges
     """
     graph = nx.read_gpickle(path+'prim-master/'+sub+'-master.gpickle')
+    return graph
+
+def powerflow(graph):
+    """
+    Checks power flow solution and save dictionary of voltages.
+    """
+    A = nx.incidence_matrix(graph,nodelist=list(graph.nodes()),
+                            edgelist=list(graph.edges()),oriented=True).toarray()
+    
+    node_ind = [i for i,node in enumerate(graph.nodes()) \
+                if graph.nodes[node]['label'] != 'S']
+    nodelist = [node for node in list(graph.nodes()) \
+                if graph.nodes[node]['label'] != 'S']
+    edgelist = [edge for edge in list(graph.edges())]
+    nodeload = nx.get_node_attributes(graph,'load')
+    
+    # Resistance data
+    edge_r = nx.get_edge_attributes(graph,'r')
+    R = np.diag([1.0/edge_r[e] if e in edge_r else 1.0/edge_r[(e[1],e[0])] \
+         for e in list(graph.edges())])
+    G = np.matmul(np.matmul(A,R),A.T)[node_ind,:][:,node_ind]
+    p = np.array([1e-3*nodeload[n] for n in nodelist])
+    
+    # Voltages and flows
+    v = np.matmul(np.linalg.inv(G),p)
+    f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
+    voltage = {h:1.0-v[i] for i,h in enumerate(nodelist)}
+    flows = {e:log(abs(f[i])) for i,e in enumerate(edgelist)}
+    subnodes = [node for node in list(graph.nodes()) \
+                if graph.nodes[node]['label'] == 'S']
+    for s in subnodes: voltage[s] = 1.0
+    nx.set_node_attributes(graph,voltage,'voltage')
+    nx.set_edge_attributes(graph,flows,'flow')
     return graph
 
 #%% Function for callback
@@ -304,11 +338,8 @@ class MILP_primary:
             print('Solution found, objective = %g' % self.model.ObjVal)
             x_optimal = self.x.getAttr("x").tolist()
             z_optimal = self.z.getAttr("x").tolist()
-            t_optimal = self.t.getAttr("x").tolist()
             self.optimal_edges = [e for i,e in enumerate(self.edges) if x_optimal[i]>0.8]
             self.roots = [self.nodes[ind] for i,ind in enumerate(self.rindex) if z_optimal[i]<0.2]
-            self.dummy = [e for i,e in enumerate(self.edges) if t_optimal[i]>0.8]
-            self.droots = [self.nodes[self.rindex[0]]]
             return    
 
 
@@ -325,6 +356,7 @@ class Primary:
         self.graph = nx.Graph()
         master = read_master_graph(path,str(subdata.id))
         M = sum(nx.get_node_attributes(master,'load').values())/1e3
+        self.secnet = nx.get_node_attributes(master,'secnet')
         self.max_mva = max([feedcap,M/div])
         self.get_partitions(master)
         return
@@ -354,7 +386,7 @@ class Primary:
         """
         """
         # Optimizaton problem to get the primary network
-        primary = []; roots = []; tnodes = []; dummy = []; droots = []
+        primary = []; roots = []; tnodes = []
         for nlist in list(nx.connected_components(self.graph)):
             subgraph = nx.subgraph(self.graph,list(nlist))
             M = MILP_primary(subgraph,grbpath=grbpath)
@@ -362,17 +394,13 @@ class Primary:
             primary += M.optimal_edges
             roots += M.roots
             tnodes += M.tnodes
-            dummy += M.dummy
-            droots += M.droots
         
         # Add the first edge between substation and nearest road node
         hvlines = [(self.subdata.id,r) for r in roots]
-        dhvlines = [(self.subdata.id,r) for r in droots]
         
         # Create the network with data as attributes
         dist_net = self.create_network(primary,hvlines)
-        dummy_net = self.create_network(dummy,dhvlines)
-        return dist_net,dummy_net
+        return dist_net
     
     
     def create_network(self,primary,hvlines):
@@ -385,19 +413,35 @@ class Primary:
             hvlines: list of edges joining the roots of the primary network with the
             substation(s).
         """
+        # Get the secondary network associated with transformers in partition
+        sec_net = nx.Graph()
+        for t in self.secnet:
+            sec_net = nx.compose(sec_net,self.secnet[t])
+        secondary = list(sec_net.edges())
+        secpos = nx.get_node_attributes(sec_net,'cord')
+        seclabel = nx.get_node_attributes(sec_net,'label')
+        secload = nx.get_node_attributes(sec_net,'resload')
+        
         # Combine both networks and update labels
         dist_net = nx.Graph()
-        dist_net.add_edges_from(hvlines+primary)
+        dist_net.add_edges_from(hvlines+primary+secondary)
         
         # Add coordinate attributes to the nodes of the network.
         nodepos = nx.get_node_attributes(self.graph,'cord')
         nodepos[self.subdata.id] = self.subdata.cord
+        nodepos.update(secpos)
         nx.set_node_attributes(dist_net,nodepos,'cord')
         
         # Label nodes of the created network
         node_label = nx.get_node_attributes(self.graph,'label')
         node_label[self.subdata.id] = 'S'
+        node_label.update(seclabel)
         nx.set_node_attributes(dist_net, node_label, 'label')
+        
+        # Load at nodes
+        nodeload = {n:secload[n] if n in secload else 0.0 \
+                    for n in dist_net.nodes()}
+        nx.set_node_attributes(dist_net,nodeload,'load')
         
         # Label edges of the created network
         feed_path = nx.get_node_attributes(self.graph,'feedpath')
@@ -410,26 +454,26 @@ class Primary:
             length = 1e-3 * MeasureDistance(nodepos[e[0]],nodepos[e[1]])
             length = length if length != 0.0 else 1e-12
             if e in primary or (e[1],e[0]) in primary:
-                edge_geom[e] = Link((nodepos[e[0]],nodepos[e[1]]))
+                edge_geom[e] = LineString((nodepos[e[0]],nodepos[e[1]]))
                 edge_label[e] = 'P'
                 edge_r[e] = 0.8625/39690 * length
                 edge_x[e] = 0.4154/39690 * length
-                glength[e] = edge_geom[e].geod_length
+                glength[e] = Link(edge_geom[e]).geod_length
             elif e in hvlines or (e[1],e[0]) in hvlines:
                 rnode = e[0] if e[1]==self.subdata.id else e[1]
                 path_cords = [self.subdata.cord]+\
                                    [nodepos[nd] for nd in feed_path[rnode]]
-                edge_geom[e] = Link(path_cords)
+                edge_geom[e] = LineString(path_cords)
                 edge_label[e] = 'E'
                 edge_r[e] = 1e-12 * length
                 edge_x[e] = 1e-12 * length
-                glength[e] = edge_geom[e].geod_length
+                glength[e] = Link(edge_geom[e]).geod_length
             else:
-                edge_geom[e] = Link((nodepos[e[0]],nodepos[e[1]]))
+                edge_geom[e] = LineString((nodepos[e[0]],nodepos[e[1]]))
                 edge_label[e] = 'S'
                 edge_r[e] = 0.81508/57.6 * length
                 edge_x[e] = 0.3496/57.6 * length
-                glength[e] = edge_geom[e].geod_length
+                glength[e] = Link(edge_geom[e]).geod_length
         nx.set_edge_attributes(dist_net, edge_geom, 'geometry')
         nx.set_edge_attributes(dist_net, edge_label, 'label')
         nx.set_edge_attributes(dist_net, edge_r, 'r')

@@ -17,13 +17,12 @@ import networkx as nx
 workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
-from pyExtractDatalib import GetRoads,GetTransformers,GetMappings
+from pyExtractDatalib import GetRoads,GetTransformers,GetMappings,GetHomes
 from pyVoronoilib import create_master_graph
 
 # Load scratchpath
 scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
 inpPath = scratchPath + "/input/"
-csvPath = scratchPath + "/csv/"
 figPath = scratchPath + "/figs/"
 tmpPath = scratchPath + "/temp/"
 
@@ -33,8 +32,9 @@ with open(inpPath+'fislist.txt') as f:
 
 
 for a in areas:
-    roads = GetRoads(inpPath,fis=a)
-    tsfr = GetTransformers(tmpPath,a)
+    roads = GetRoads(inpPath,a)
+    homes = GetHomes(inpPath,a)
+    tsfr = GetTransformers(tmpPath,a,homes)
     links = GetMappings(tmpPath,a)
     g = create_master_graph(roads,tsfr,links)
     nx.write_gpickle(g, tmpPath+'master-graph/'+a+'-graph.gpickle')

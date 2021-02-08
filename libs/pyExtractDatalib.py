@@ -21,6 +21,35 @@ from geographiclib.geodesic import Geodesic
 from pyqtree import Index
 
 
+class Link(LineString):
+    """
+    Derived class from Shapely LineString to compute metric distance based on 
+    geographical coordinates over geometric coordinates.
+    """
+    def __init__(self,line_geom):
+        """
+        """
+        super().__init__(line_geom)
+        self.geod_length = self.__length()
+        return
+    
+    
+    def __length(self):
+        '''
+        Computes the geographical length in meters between the ends of the link.
+        '''
+        if self.geom_type != 'LineString':
+            print("Cannot compute length!!!")
+            return None
+        # Compute great circle distance
+        geod = Geodesic.WGS84
+        length = 0.0
+        for i in range(len(list(self.coords))-1):
+            lon1,lon2 = self.xy[0][i:i+2]
+            lat1,lat2 = self.xy[1][i:i+2]
+            length += geod.Inverse(lat1, lon1, lat2, lon2)['s12']
+        return length
+
 #%% Functions
 
 
@@ -213,19 +242,22 @@ def GetSubstations(path,areas=['121'],state_fis='51',
     return subs(cord=dict_cord)
 
 
-def GetTransformers(path,fis):
+def GetTransformers(path,fis,homes):
     """
     Gets the network of local transformers in the county/city
     """
     df_tsfr = pd.read_csv(path+'sec-network/'+fis+'-tsfr-data.csv',
                           header=None,names=['tid','long','lat','load'])
-    tsfr = nt("Transformers",field_names=["cord","load","graph"])
+    tsfr = nt("Transformers",field_names=["cord","load","graph","secnet"])
     dict_cord = dict([(t.tid, (t.long, t.lat)) for t in df_tsfr.itertuples()])
     dict_load = dict([(t.tid, t.load) for t in df_tsfr.itertuples()])
     df_tsfr_edges = pd.read_csv(path+'sec-network/'+fis+'-tsfr-net.csv',
                                 header=None,names=['source','target'])
     g = nx.from_pandas_edgelist(df_tsfr_edges)
-    return tsfr(cord=dict_cord,load=dict_load,graph=g)
+    secnet = GetSecnet(path,fis,homes)
+    g_sec = {t: nx.subgraph(secnet,list(nx.descendants(secnet,t))+[t]) \
+             for t in dict_cord}
+    return tsfr(cord=dict_cord,load=dict_load,graph=g,secnet=g_sec)
 
 def GetMappings(path,fis):
     """
@@ -282,3 +314,37 @@ def GetVASubstations(path,sub_file='Electric_Substations.shp',
     return subs(cord=cord)
 
 
+def GetSecnet(path,fis,homes):
+    """
+    Extracts the generated secondary network information for the area and
+    constructs the networkx graph. The attributes are listed below.
+    Node attributes: 
+        cord: geographical coordinates
+        label: node label, H: residence, T: transformer
+        resload: average load at residence
+    """
+    # Extract the secondary network data from all areas
+    nodelabel = {}
+    nodepos = {}
+    edgelist = []
+    
+    with open(path+'sec-network/'+str(fis)+'-sec-dist.txt','r') as f:
+        lines = f.readlines()
+    for line in lines:
+        data = line.strip('\n').split('\t')
+        n1 = int(data[0]); n2 = int(data[4])
+        edgelist.append((n1,n2))
+        # nodedata
+        nodepos[n1]=(float(data[2]),float(data[3]))
+        nodepos[n2]=(float(data[6]),float(data[7]))
+        nodelabel[n1] = data[1] 
+        nodelabel[n2] = data[5]
+    # Construct the graph
+    dict_load = {n:homes.average[n] if nodelabel[n]=='H' else 0.0 \
+                 for n in nodepos}
+    secnet = nx.Graph()
+    secnet.add_edges_from(edgelist)
+    nx.set_node_attributes(secnet,nodepos,'cord')
+    nx.set_node_attributes(secnet,nodelabel,'label')
+    nx.set_node_attributes(secnet,dict_load,'resload')
+    return secnet

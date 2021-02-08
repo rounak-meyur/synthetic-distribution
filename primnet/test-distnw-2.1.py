@@ -14,7 +14,7 @@ rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 inppath = rootpath + "/input/"
 figpath = workpath + "/figs/"
-distpath = workpath + "/out/dist-network/"
+distpath = workpath + "/out/prim-network/"
 
 
 sys.path.append(libpath)
@@ -48,7 +48,7 @@ def GetDistNet(path,code):
     """
     graph = nx.Graph()
     for c in code:
-        g = nx.read_gpickle(path+str(c)+'-distnet.gpickle')
+        g = nx.read_gpickle(path+str(c)+'-prim-dist.gpickle')
         graph = nx.compose(graph,g)
     return graph
 
@@ -69,7 +69,7 @@ dict_inset = {121143:{'graph':small_synth_net1,'loc':2,
 
 ##%% Plot the network with inset figure
 plot_network(synth_net,dict_inset,figpath,with_secnet=True)
-sys.exit(0)
+
 #%% Voltage and flow plots
 color_nodes(synth_net,dict_inset,figpath)
 color_edges(synth_net,dict_inset,figpath)

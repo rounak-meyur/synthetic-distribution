@@ -25,7 +25,6 @@ from pyVoronoilib import create_voronoi as vorpart
 # Load scratchpath
 scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
 inpPath = scratchPath + "/input/"
-csvPath = scratchPath + "/csv/"
 figPath = scratchPath + "/figs/"
 tmpPath = scratchPath + "/temp/"
 
