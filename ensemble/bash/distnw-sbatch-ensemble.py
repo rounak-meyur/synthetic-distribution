@@ -295,12 +295,36 @@ def compute_hops(u,link,hop):
 
 def compute_length(u,link,length,graph):
     if u not in length:
-        return compute_hops(link[u],link,length)+graph[u][link[u]]['cost']
+        return compute_length(link[u],link,length,graph)+graph[u][link[u]]['cost']
     else:
         return length[u]
 
 
-def random_spanning_tree(graph,root,dmax=100):
+def random_spanning_tree(graph,root):
+    link = {}
+    in_tree = []
+    in_tree.append(root)
+    nodelist = [n for n in graph if n!=root]
+    nodes = []
+    
+    while len(nodelist)!=0:
+        u = nodelist[0]
+        while u not in in_tree:
+            link[u] = random_successor(graph,u)
+            u = link[u]
+        u = nodelist[0]
+        while u not in in_tree:
+            in_tree.append(u)
+            nodes.append(u)
+            u = link[u]
+        del nodelist[0]
+    edgelist = [(link[n],n) for n in nodes]
+    G = nx.Graph()
+    G.add_edges_from(edgelist)
+    return G
+
+
+def hc_random_spanning_tree(graph,root,dmax=100):
     link = {}
     in_tree = []
     in_tree.append(root)
@@ -316,7 +340,7 @@ def random_spanning_tree(graph,root,dmax=100):
         u = nodelist[0]
         while u not in in_tree:
             h = compute_hops(u,link,hop)
-            # h = compute_length(u,link,hop,graph)
+            h = compute_length(u,link,hop,graph)
             if h<=dmax:
                 hop[u] = h
                 in_tree.append(u)

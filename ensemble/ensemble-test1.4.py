@@ -316,25 +316,10 @@ def compute_hops(u,link,hop):
         return hop[u]
     
 
-def compute_length(u,link,length,graph):
-    if u not in length:
-        return compute_length(link[u],link,length,graph)+graph[u][link[u]]['cost']
-    else:
-        return length[u]
-    
-
-def compute_load(u,link,load,graph):
-    if u not in load:
-        return compute_load(link[u],link,load,graph)+(graph.nodes[u]['load']*1e-3)
-    else:
-        return load[u]
-
-
-def random_spanning_tree(graph,root):
+def random_Steiner_tree(graph,root,nodelist):
     link = {}
     in_tree = []
     in_tree.append(root)
-    nodelist = [n for n in graph if n!=root]
     nodes = []
     
     while len(nodelist)!=0:
@@ -354,7 +339,7 @@ def random_spanning_tree(graph,root):
     return G
 
 
-def hc_random_spanning_tree(graph,root,dmax=100):
+def hc_random_Steiner_tree(graph,root,nodelist,dmax=100):
     """
     Hop constrained random spanning tree generation.
 
@@ -376,7 +361,6 @@ def hc_random_spanning_tree(graph,root,dmax=100):
     link = {}
     in_tree = []
     in_tree.append(root)
-    nodelist = [n for n in graph if n!=root]
     nodes = []
     hop = {root:0}
     
@@ -403,127 +387,16 @@ def hc_random_spanning_tree(graph,root,dmax=100):
     return G
 
 
-def dc_random_spanning_tree(graph,root,dmax=100):
-    """
-    
-
-    Parameters
-    ----------
-    graph : TYPE
-        DESCRIPTION.
-    root : TYPE
-        DESCRIPTION.
-    dmax : TYPE, optional
-        DESCRIPTION. The default is 100.
-
-    Returns
-    -------
-    G : TYPE
-        DESCRIPTION.
-
-    """
-    link = {}
-    in_tree = []
-    in_tree.append(root)
-    nodelist = [n for n in graph if n!=root]
-    nodes = []
-    hop = {root:0}
-    
-    while len(nodelist)!=0:
-        u = nodelist[0]
-        while u not in in_tree:
-            link[u] = random_successor(graph,u)
-            u = link[u]
-        u = nodelist[0]
-        while u not in in_tree:
-            h = compute_length(u,link,hop,graph)
-            if h<=dmax:
-                hop[u] = h
-                in_tree.append(u)
-                u = link[u]
-                flag = 1
-            else:
-                flag = 0
-                break
-        if flag == 1: nodes.append(nodelist.pop(0))
-    edgelist = [(link[n],n) for n in nodes]
-    G = nx.Graph()
-    G.add_edges_from(edgelist)
-    return G
-
-
-def lc_random_spanning_tree(graph,root,dmax=100):
-    """
-    Load constrained random spanning tree.
-
-    Parameters
-    ----------
-    graph : TYPE
-        DESCRIPTION.
-    root : TYPE
-        DESCRIPTION.
-    dmax : TYPE, optional
-        DESCRIPTION. The default is 100.
-
-    Returns
-    -------
-    G : TYPE
-        DESCRIPTION.
-
-    """
-    link = {}
-    in_tree = []
-    in_tree.append(root)
-    nodelist = [n for n in graph if n!=root]
-    nodes = []
-    hop = {root:0}
-    
-    while len(nodelist)!=0:
-        u = nodelist[0]
-        while u not in in_tree:
-            link[u] = random_successor(graph,u)
-            u = link[u]
-        u = nodelist[0]
-        while u not in in_tree:
-            h = compute_load(u,link,hop,graph)
-            if h<=dmax:
-                hop[u] = h
-                in_tree.append(u)
-                u = link[u]
-                flag = 1
-            else:
-                flag = 0
-                break
-        if flag == 1: nodes.append(nodelist.pop(0))
-    edgelist = [(link[n],n) for n in nodes]
-    G = nx.Graph()
-    G.add_edges_from(edgelist)
-    return G
-
-def Trim_Tree(T,synth_net):
-    end_road = [n for n in T \
-            if nx.degree(T,n)==1 and synth_net.nodes[n]['label']=='R']
-    while len(end_road)!=0:
-        for r in end_road:
-            T.remove_node(r)
-        end_road = [n for n in T \
-                if nx.degree(T,n)==1 and synth_net.nodes[n]['label']=='R']
-    return
 
 #%% Create random Steiner trees
+tnodes = [n for n in graph if synth_net.nodes[n]['label']=='T']
+
+suffix = ''
+tree = random_Steiner_tree(graph,sub,tnodes)
+
 # suffix = 'hc-'
 # tree = hc_random_spanning_tree(graph,sub,dmax=100)
 
-# suffix = ''
-# tree = random_spanning_tree(graph,sub)
-
-# suffix = 'dc-'
-# tree = dc_random_spanning_tree(graph,sub,dmax=100)
-
-suffix = 'lc-'
-tree = lc_random_spanning_tree(graph,sub,dmax=100)
-
-Trim_Tree(tree,synth_net)
 create_network(tree,synth_net)
 powerflow(tree)
 # nx.write_gpickle(tree,

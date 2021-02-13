@@ -21,7 +21,7 @@ rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
 distpath = rootpath + "/primnet/out/prim-network/"
-outpath = workpath + "/out/"
+outpath = workpath + "/out/try2/"
 sys.path.append(libpath)
 
 
@@ -78,6 +78,7 @@ net_length = []
 voltage = []
 flows = []
 Hops = []
+Dist = []
 for i in range(100):
     graph = nx.read_gpickle(outpath+str(sub)+'-ensemble-'+str(i)+'.gpickle')
     net_length.append(sum([graph[e[0]][e[1]]['geo_length'] \
@@ -87,6 +88,8 @@ for i in range(100):
     flows.append([graph[e[0]][e[1]]['flow'] for e in graph.edges])
     Hops.append(np.array([nx.shortest_path_length(graph,n,sub) \
                                   for n in list(graph.nodes())]))
+    Dist.append(np.array([nx.shortest_path_length(graph,n,sub,weight='geo_length') \
+                                  for n in list(graph.nodes())])*1e-3)
 
 #%% Plot the comparisons
 fig = plt.figure(figsize=(10,6))
@@ -150,9 +153,23 @@ fig = plt.figure(figsize=(10,6))
 ax = fig.add_subplot(111)
 for i in range(100):
     sns.kdeplot(Hops[i],shade=False,color=col[i%3])
-ax.set_ylabel('Density',fontsize=20)
+ax.set_ylabel('Percentage of nodes',fontsize=20)
 ax.set_xlabel('Hops from root node',fontsize=20)
 ax.set_title("Hop distribution",fontsize=20)
+labels = ax.get_yticks()
+ax.set_yticklabels(["{:.1f}".format(100.0*i) for i in labels])
+
+#%% Reach distribution
+col = ['r','g','b']
+fig = plt.figure(figsize=(10,6))
+ax = fig.add_subplot(111)
+for i in range(100):
+    sns.kdeplot(Dist[i],shade=False,color=col[i%3])
+ax.set_ylabel('Percentage of nodes',fontsize=20)
+ax.set_xlabel('Distance (in km) from root node',fontsize=20)
+ax.set_title("Reach distribution",fontsize=20)
+labels = ax.get_yticks()
+ax.set_yticklabels(["{:.1f}".format(100.0*i) for i in labels])
 
 
 

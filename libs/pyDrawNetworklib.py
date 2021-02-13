@@ -151,7 +151,7 @@ def color_nodes(net,inset={},path=None):
 
 
 def color_edges(net,inset={},path=None):
-    fig = plt.figure(figsize=(30,30),dpi=72)
+    fig = plt.figure(figsize=(35,30),dpi=72)
     ax = fig.add_subplot(111)
     
     # Draw nodes
@@ -160,14 +160,16 @@ def color_edges(net,inset={},path=None):
     # Draw edges
     d = {'edges':net.edges(),
          'geometry':[net[e[0]][e[1]]['geometry'] for e in net.edges()],
-         'flows':[np.exp(net[e[0]][e[1]]['flow']) for e in net.edges()]}
+         'flows':[net[e[0]][e[1]]['flow'] for e in net.edges()]}
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    fmin = 0.2; fmax = 800.0
+    fmin = np.log(0.2); fmax = np.log(800.0)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.001)
     df_edges.plot(column='flows',ax=ax,cmap=cm.plasma,vmin=fmin,vmax=fmax,
                   cax=cax,legend=True)
     cax.set_ylabel('Flow along edge in kVA',size=30)
+    labels = [100,200,300,400,500,600,700,800]
+    cax.set_yticklabels(labels)
     cax.tick_params(labelsize=20)
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
     
