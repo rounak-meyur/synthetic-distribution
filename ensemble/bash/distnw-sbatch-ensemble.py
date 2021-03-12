@@ -12,6 +12,7 @@ import numpy as np
 from shapely.geometry import Point,LineString
 from geographiclib.geodesic import Geodesic
 from math import log
+import threading
 
 workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
@@ -227,156 +228,109 @@ def powerflow(graph):
     nx.set_edge_attributes(graph,flows,'flow')
     return
 
-#%% Create list of additional edges
-prim_nodes = [n for n in synth_net if synth_net.nodes[n]['label']!='H']
-prim_edges = [e for e in synth_net.edges() \
-              if synth_net[e[0]][e[1]]['label']!='S']
-edgelist = [e for e in prim_edges if synth_net[e[0]][e[1]]['label']!='E']
-
-new_edges = []
-for edge in edgelist:
-    new_network = synth_net.__class__()
-    new_network.add_nodes_from(prim_nodes)
-    new_network.add_edges_from(prim_edges)
+#%% Create new networks
+def get_new(graph,sub):
+    """
+    Gets a new network from the original synthetic distribution network by 
+    swapping an edge with a minimum length reconnection. The created network is
+    rejected if power flow is not satisfied.
+    """
+    prim_nodes = [n for n in graph if graph.nodes[n]['label']!='H']
+    prim_edges = [e for e in graph.edges() \
+                  if graph[e[0]][e[1]]['label']!='S']
     
-    # Remove edge from the primary network
-    new_network.remove_edge(*edge)
+    # Reconstruct primary network
+    new_graph = graph.__class__()
+    new_graph.add_nodes_from(prim_nodes)
+    new_graph.add_edges_from(prim_edges)
     
-    # Get the end point unconnected to root node
-    # end node: node connected to root graph
-    # other node: node unconnected to root graph
-    # Note that connected node must be a transformer node
-    end_node = edge[0] if nx.has_path(new_network,sub,edge[0]) else edge[1]
-    other_node = edge[0] if end_node==edge[1] else edge[1]
-    if synth_net.nodes[end_node]['label']=='T':
-        # Connect the unconnected node to another nearby node
-        comps = list(nx.connected_components(new_network))
+    # Get edgelist for random sampling and remove an edge
+    edgelist = [e for e in prim_edges if graph[e[0]][e[1]]['label']!='E']
+    rand_edge = edgelist[np.random.choice(range(len(edgelist)))]
+    new_graph.remove_edge(*rand_edge)
+    
+    # Get node labels for the edge: end_node is connected to root
+    if nx.has_path(new_graph,sub,rand_edge[0]):
+        end_node = rand_edge[0]
+    else:
+        end_node = rand_edge[1]
+    other_node = rand_edge[0] if end_node==rand_edge[1] else rand_edge[1]
+    
+    if graph.nodes[end_node]['label']=='R':
+        # print("Leaf node is road node. Choose another edge.")
+        return graph,0
+    else:
+        # print("Found a suitable edge to remove. Proceeding...")
+        comps = list(nx.connected_components(new_graph))
         connected_nodes = list(comps[0]) \
-            if end_node in list(comps[0]) else list(comps[1])
-        dict_node = {n:synth_net.nodes[n]['cord'] for n in connected_nodes \
+                if end_node in list(comps[0]) else list(comps[1])
+        dict_node = {n:graph.nodes[n]['cord'] for n in connected_nodes \
                      if n!=end_node}
-        center_node = synth_net.nodes[other_node]['cord']
+        center_node = graph.nodes[other_node]['cord']
         near_node = find_nearest_node(center_node,dict_node)
-        new_edges.append((near_node,other_node))
+        new_edge = (near_node,other_node)
+        new_graph.add_edge(*new_edge)
+        create_network(new_graph,graph)
         
-#%% Create super graph by adding additional edges and computing edge costs
-graph = synth_net.__class__()
-graph.add_nodes_from(prim_nodes)
-graph.add_edges_from(prim_edges)
-graph.add_edges_from(new_edges)
-
-edge_cost = {}
-for e in graph.edges():
-    if e in synth_net.edges:
-        edge_cost[e] = synth_net[e[0]][e[1]]['geo_length']/1e3
-    else:
-        edge_geom = LineString((synth_net.nodes[e[0]]['cord'],
-                                synth_net.nodes[e[1]]['cord']))
-        edge_cost[e] = Link(edge_geom).geod_length/1e3
-    if edge_cost[e] == 0.0:
-        edge_cost[e] = 1e-12
-nx.set_edge_attributes(graph,edge_cost,'cost')
+        # print("Checking power flow result...")
+        powerflow(new_graph)
+        voltage = [new_graph.nodes[n]['voltage'] for n in new_graph \
+                   if new_graph.nodes[n]['label']!='H']
+        low_voltage_nodes = [v for v in voltage if v<=0.87]
+        check = (len(low_voltage_nodes)/len(voltage))*100.0
+        if check>5.0:
+            print("Many nodes have low voltage. Percentage:",check)
+            return graph,0
+        else:
+            print("Acceptable power flow results. Percentage:",check)
+            return new_graph,1
 
 
 
-def random_successor(G,n):
-    neighbors = list(nx.neighbors(G,n))
-    cost = sum([np.exp(-G[n][i]['cost']) for i in neighbors])
-    prob = [np.exp(-G[n][i]['cost'])/cost for i in neighbors]
-    return np.random.choice(neighbors,p=prob)
+
+#%% Create networks
+# Markov chain initialized with the same graph M times 
+# and traversed over N iterations
+
+def process(items, start, end):
+    for item in items[start:end]:
+        iterations = 100
+        try:
+            count = 0
+            while count < iterations:
+                if count == 0:
+                    new_graph,flag = get_new(synth_net,sub)
+                else:
+                    new_graph,flag = get_new(new_graph,sub)
+                count += flag
+            # save the network
+            nx.write_gpickle(new_graph,
+                             tmppath+str(sub)+'-ensemble-'+str(item+1)+'.gpickle')
+        except Exception:
+            print('error with item')
+
+def split_processing(items, num_splits=4):
+    split_size = len(items) // num_splits
+    threads = []
+    for i in range(num_splits):
+        # determine the indices of the list this thread will handle
+        start = i * split_size
+        # special case on the last chunk to account for uneven splits
+        end = None if i+1 == num_splits else (i+1) * split_size
+        # create the thread
+        threads.append(
+            threading.Thread(target=process, args=(items, start, end)))
+        threads[-1].start() # start the thread we just created
+
+    # wait for all threads to finish
+    for t in threads:
+        t.join()
 
 
-def compute_hops(u,link,hop):
-    if u not in hop:
-        return compute_hops(link[u],link,hop)+1
-    else:
-        return hop[u]
+
+numnets = 20
+items = range(numnets)
+split_processing(items)
     
-
-def compute_length(u,link,length,graph):
-    if u not in length:
-        return compute_length(link[u],link,length,graph)+graph[u][link[u]]['cost']
-    else:
-        return length[u]
-
-
-def random_spanning_tree(graph,root):
-    link = {}
-    in_tree = []
-    in_tree.append(root)
-    nodelist = [n for n in graph if n!=root]
-    nodes = []
-    
-    while len(nodelist)!=0:
-        u = nodelist[0]
-        while u not in in_tree:
-            link[u] = random_successor(graph,u)
-            u = link[u]
-        u = nodelist[0]
-        while u not in in_tree:
-            in_tree.append(u)
-            nodes.append(u)
-            u = link[u]
-        del nodelist[0]
-    edgelist = [(link[n],n) for n in nodes]
-    G = nx.Graph()
-    G.add_edges_from(edgelist)
-    return G
-
-
-def hc_random_spanning_tree(graph,root,dmax=100):
-    link = {}
-    in_tree = []
-    in_tree.append(root)
-    nodelist = [n for n in graph if n!=root]
-    nodes = []
-    hop = {root:0}
-    
-    while len(nodelist)!=0:
-        u = nodelist[0]
-        while u not in in_tree:
-            link[u] = random_successor(graph,u)
-            u = link[u]
-        u = nodelist[0]
-        while u not in in_tree:
-            h = compute_hops(u,link,hop)
-            h = compute_length(u,link,hop,graph)
-            if h<=dmax:
-                hop[u] = h
-                in_tree.append(u)
-                u = link[u]
-                flag = 1
-            else:
-                flag = 0
-                break
-        if flag == 1: nodes.append(nodelist.pop(0))
-    edgelist = [(link[n],n) for n in nodes]
-    G = nx.Graph()
-    G.add_edges_from(edgelist)
-    return G
-
-def Trim_Tree(T,synth_net):
-    end_road = [n for n in T \
-            if nx.degree(T,n)==1 and synth_net.nodes[n]['label']=='R']
-    while len(end_road)!=0:
-        for r in end_road:
-            T.remove_node(r)
-        end_road = [n for n in T \
-                if nx.degree(T,n)==1 and synth_net.nodes[n]['label']=='R']
-    return
-
-for i in range(100):
-    tree = random_spanning_tree(graph,sub,dmax=100)
-    Trim_Tree(tree,synth_net)
-    create_network(tree,synth_net)
-    powerflow(tree)
-    nx.write_gpickle(tree,
-            tmppath+'ensemble/'+str(sub)+'-ensemble-'+str(i)+'.gpickle')
-
-
-
-
-
-
 
 

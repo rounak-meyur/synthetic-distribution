@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Jan 27 20:10:18 2021
+Created on Wed Mar  3 11:43:38 2021
 
 @author: rouna
 """
 
 import sys,os
 import networkx as nx
-import matplotlib.pyplot as plt
 from pyqtree import Index
 import numpy as np
 from shapely.geometry import Point,LineString
 from geographiclib.geodesic import Geodesic
 from math import log
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 
@@ -65,15 +65,20 @@ def GetDistNet(path,code):
 #        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
 #        150727, 150728]
 sub = 121144
+# sub = 147793
 synth_net = GetDistNet(distpath,sub)
+
 org_length = sum([synth_net[e[0]][e[1]]['geo_length'] for e in synth_net.edges])/1000
 org_flows = {e:synth_net[e[0]][e[1]]['flow'] for e in synth_net.edges}
 org_voltage = {n:synth_net.nodes[n]['voltage'] for n in synth_net.nodes}
-# plot_network(synth_net,with_secnet=True)
-num_nets = 1000
+
+plot_network(synth_net,with_secnet=True,path=figpath+str(sub)+'-org-net-')
+color_nodes(synth_net,path=figpath+str(sub)+'-orgvolt-')
+color_edges(synth_net,path=figpath+str(sub)+'-orgflow-')
 
 
-#%% Get ensemble of networks
+#%% Hop distribution
+num_nets = 20
 net_length = []
 voltage = []
 flows = []
@@ -91,11 +96,12 @@ for i in range(1,num_nets+1):
     Dist.append(np.array([nx.shortest_path_length(graph,n,sub,weight='geo_length') \
                                   for n in list(graph.nodes())])*1e-3)
 
+
 #%% Plot the comparisons
 fig = plt.figure(figsize=(10,6))
 ax = fig.add_subplot(111)
 ax.scatter(range(1,num_nets+1),net_length,c='crimson',marker='^')
-ax.hlines(org_length,xmin=1,xmax=100,linestyle='dashed',color='blue')
+ax.hlines(org_length,xmin=1,xmax=num_nets,linestyle='dashed',color='blue')
 ax.tick_params(bottom=False,labelbottom=False)
 ax.set_ylabel('Length of network (in km)',fontsize=14)
 ax.set_title("Comparison of network length",fontsize=14)
@@ -172,29 +178,14 @@ labels = ax.get_yticks()
 ax.set_yticklabels(["{:.1f}".format(100.0*i) for i in labels])
 
 
+#%% Plot new network
+i = 20
+suffix = str(sub)+'-'+str(i)
+tree = nx.read_gpickle(outpath+str(sub)+'-ensemble-'+str(i)+'.gpickle')
+plot_network(tree,with_secnet=True,path=figpath+'mc-net-'+suffix)
+color_nodes(tree,path=figpath+'mc-volt-'+suffix)
+color_edges(tree,path=figpath+'mc-flow-'+suffix)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#%%
+sns.kdeplot(Hops[0],shade=False,color='red')
+sns.kdeplot(Hops[5],shade=False,color='blue')

@@ -300,7 +300,7 @@ node_load = {k:get_load(synth_net,k) \
                  for k in graph}
 nx.set_node_attributes(graph,node_load,'load')
 
-sys.exit(0)
+# sys.exit(0)
 #%% Random spanning tree formulation
 def random_successor(G,n):
     neighbors = list(nx.neighbors(G,n))
@@ -314,6 +314,14 @@ def compute_hops(u,link,hop):
         return compute_hops(link[u],link,hop)+1
     else:
         return hop[u]
+
+
+def compute_load(u,link,load,graph):
+    if u not in load:
+        return compute_load(link[u],link,
+                            load,graph)+(graph.nodes[u]['load']*1e-3)
+    else:
+        return load[u]
     
 
 def random_Steiner_tree(graph,root,nodelist):
@@ -378,6 +386,58 @@ def hc_random_Steiner_tree(graph,root,nodelist,dmax=100):
                 u = link[u]
                 flag = 1
             else:
+                print("Far away",u)
+                flag = 0
+                break
+        if flag == 1:
+            new_node = nodelist.pop(0)
+            nodes.append(new_node)
+    edgelist = [(link[n],n) for n in nodes]
+    G = nx.Graph()
+    G.add_edges_from(edgelist)
+    return G
+
+
+def lc_random_Steiner_tree(graph,root,nodelist,lmax=500):
+    """
+    Path load constrained random spanning tree generation.
+
+    Parameters
+    ----------
+    graph : TYPE
+        DESCRIPTION.
+    root : TYPE
+        DESCRIPTION.
+    dmax : TYPE, optional
+        DESCRIPTION. The default is 100.
+
+    Returns
+    -------
+    G : TYPE
+        DESCRIPTION.
+
+    """
+    link = {}
+    in_tree = []
+    in_tree.append(root)
+    nodes = []
+    load = {root:0}
+    
+    while len(nodelist)!=0:
+        u = nodelist[0]
+        while u not in in_tree:
+            link[u] = random_successor(graph,u)
+            u = link[u]
+        u = nodelist[0]
+        while u not in in_tree:
+            h = compute_load(u,link,load,graph)
+            print(u,h)
+            if h<=lmax:
+                load[u] = h
+                in_tree.append(u)
+                u = link[u]
+                flag = 1
+            else:
                 flag = 0
                 break
         if flag == 1: nodes.append(nodelist.pop(0))
@@ -395,13 +455,16 @@ suffix = ''
 tree = random_Steiner_tree(graph,sub,tnodes)
 
 # suffix = 'hc-'
-# tree = hc_random_spanning_tree(graph,sub,dmax=100)
+# tree = hc_random_Steiner_tree(graph,sub,tnodes,dmax=100)
+
+# suffix = 'lc-'
+# tree = lc_random_Steiner_tree(graph,sub,tnodes,lmax=800)
 
 create_network(tree,synth_net)
 powerflow(tree)
-# nx.write_gpickle(tree,
-#             outpath+str(sub)+'-ensemble-'+suffix+'rand.gpickle')
-sys.exit(0)
+nx.write_gpickle(tree,
+            outpath+str(sub)+'-ensemble-'+suffix+'rand.gpickle')
+# sys.exit(0)
 
 
 #%% Plot
@@ -454,22 +517,96 @@ fig.savefig("{}{}.png".format(figpath+suffix,'distcomp'),bbox_inches='tight')
 
 
 
+#%% Load and distance check
+import geopandas as gpd
+
+tnodes = [n for n in synth_net if synth_net.nodes[n]['label']=='T']
+L1 = {t: nx.shortest_path_length(synth_net,sub,t) for t in tnodes}
+L2 = {t: nx.shortest_path_length(tree,sub,t) for t in tnodes}
+cnodes = [n for n in tnodes if L1[n]==L2[n]]
+
+p1 = nx.shortest_path(synth_net,sub,cnodes[0])
+p2 = nx.shortest_path(tree,sub,cnodes[0])
+edges1 = [(p1[i],p1[i+1]) for i in range(len(p1)-1)]
+edges2 = [(p2[i],p2[i+1]) for i in range(len(p2)-1)]
+d1 = {'edges':edges1,
+     'geometry':[synth_net[e[0]][e[1]]['geometry'] for e in edges1]}
+df1_edges = gpd.GeoDataFrame(d1, crs="EPSG:4326")
+d2 = {'edges':edges2,
+     'geometry':[tree[e[0]][e[1]]['geometry'] for e in edges2]}
+df2_edges = gpd.GeoDataFrame(d2, crs="EPSG:4326")
 
 
+fig = plt.figure(figsize=(20,14))
+ax1 = fig.add_subplot(121)
+ax2 = fig.add_subplot(122)
+d = {'edges':synth_net.edges(),
+     'geometry':[synth_net[e[0]][e[1]]['geometry'] for e in synth_net.edges()]}
+df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
+df_edges.plot(ax=ax1,edgecolor='black',linewidth=0.5,linestyle='dotted')
+d = {'edges':tree.edges(),
+     'geometry':[tree[e[0]][e[1]]['geometry'] for e in tree.edges()]}
+df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
+df_edges.plot(ax=ax2,edgecolor='black',linewidth=0.5,linestyle='dotted')
 
+df1_edges.plot(ax=ax1,edgecolor='blue',linewidth=5)
+df2_edges.plot(ax=ax2,edgecolor='blue',linewidth=5)
 
+ax1.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+ax2.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
 
+#%% Voltage, load and distance
+v1 = [synth_net.nodes[n]['voltage'] for n in p1]
+v2 = [tree.nodes[n]['voltage'] for n in p2]
+l1 = [graph.nodes[n]['load'] for n in p1]
+l2 = [graph.nodes[n]['load'] for n in p2]
+d1 = [synth_net.edges[e]['geo_length'] for e in edges1]
+d2 = [tree.edges[e]['geo_length'] for e in edges2]
 
+ind = np.arange(len(p1))  # the x locations for the groups
+width = 0.35  # the width of the bars
 
+fig, ax = plt.subplots()
+ax.bar(ind - width/2, l1, width, label='Optimal Network')
+ax.bar(ind + width/2, l2, width, label='Random Network')
 
+# Add some text for labels, title and custom x-axis tick labels, etc.
+ax.set_ylabel('Load Demand (in Watts)')
+ax.set_xlabel('Node index along path')
+ax.set_title('Load along path to the substation')
+ax.legend()
 
+ind = np.arange(len(p1)-2)  # the x locations for the groups
+fig, ax = plt.subplots()
+rects1 = ax.bar(ind - width/2, d1[1:], width, label='Optimal Network')
+rects2 = ax.bar(ind + width/2, d2[1:], width, label='Random Network')
 
+# Add some text for labels, title and custom x-axis tick labels, etc.
+ax.set_ylabel('Edge distance (in meters)')
+ax.set_xlabel('Edge index along path')
+ax.set_title('Edge distance along path to the substation')
+ax.legend()
 
+#%% Voltage and power flow
+path = synth_net.__class__()
+path.add_nodes_from(p2)
+path.add_edges_from(edges2)
+nodeload = {n:graph.nodes[n]['load'] for n in p2}
+nodelabel = {n:tree.nodes[n]['label'] for n in p2}
+edge_r = {e:tree[e[0]][e[1]]['r'] for e in edges2}
+nx.set_node_attributes(path,nodeload,'load')
+nx.set_node_attributes(path,nodelabel,'label')
+nx.set_edge_attributes(path,edge_r,'r')
+powerflow(path)
+v3 = [path.nodes[n]['voltage'] for n in p2]
 
+ind = np.arange(len(p1))
+fig, ax = plt.subplots()
+ax.bar(ind - width/2, v1, width, label='Optimal Network')
+ax.bar(ind + width/2, v3, width, label='Only path')
 
-
-
-
-
-
-
+# Add some text for labels, title and custom x-axis tick labels, etc.
+ax.set_ylabel('Node voltage (in pu)')
+ax.set_xlabel('Node index along path')
+ax.set_title('Node voltage along path to the substation')
+ax.legend()

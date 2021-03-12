@@ -100,7 +100,7 @@ def plot_network(net,inset={},path=None,with_secnet=False):
                    marker='o',markersize=20,label='substation')]
     ax.legend(handles=leghands,loc='best',ncol=1,prop={'size': 25})
     if path != None: 
-        fig.savefig("{}{}.png".format(path,'51121-dist'),bbox_inches='tight')
+        fig.savefig("{}{}.png".format(path,'-51121-dist'),bbox_inches='tight')
     return
 
 
@@ -146,7 +146,7 @@ def color_nodes(net,inset={},path=None):
         mark_inset(ax, axins, loc1=inset[sub]['loc1'], loc2=inset[sub]['loc2'], 
                fc="none", ec="0.5")
     if path!=None:
-        fig.savefig("{}{}.png".format(path,'51121-dist-voltage'),bbox_inches='tight')
+        fig.savefig("{}{}.png".format(path,'-51121-dist-voltage'),bbox_inches='tight')
     return
 
 
@@ -193,5 +193,5 @@ def color_edges(net,inset={},path=None):
         mark_inset(ax, axins, loc1=inset[sub]['loc1'], loc2=inset[sub]['loc2'], 
                fc="none", ec="0.5")
     if path!=None:
-        fig.savefig("{}{}.png".format(path,'51121-dist-flows'),bbox_inches='tight')
+        fig.savefig("{}{}.png".format(path,'-51121-dist-flows'),bbox_inches='tight')
     return

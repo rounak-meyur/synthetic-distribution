@@ -12,6 +12,8 @@ import numpy as np
 from shapely.geometry import Point,LineString
 from geographiclib.geodesic import Geodesic
 from math import log
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 workpath = os.getcwd()
@@ -64,6 +66,9 @@ def GetDistNet(path,code):
 #        150727, 150728]
 sub = 121144
 synth_net = GetDistNet(distpath,sub)
+org_length = sum([synth_net[e[0]][e[1]]['geo_length'] for e in synth_net.edges])/1000
+org_flows = {e:synth_net[e[0]][e[1]]['flow'] for e in synth_net.edges}
+org_voltage = {n:synth_net.nodes[n]['voltage'] for n in synth_net.nodes}
 # plot_network(synth_net,with_secnet=True)
 
 #%% Functions
@@ -232,61 +237,80 @@ def powerflow(graph):
     return
 
 #%% Create new networks
-prim_nodes = [n for n in synth_net if synth_net.nodes[n]['label']!='H']
-prim_edges = [e for e in synth_net.edges() \
-              if synth_net[e[0]][e[1]]['label']!='S']
 
-prim_length = sum([synth_net[e[0]][e[1]]['geo_length'] \
-                    for e in prim_edges])
-edgelist = [e for e in prim_edges if synth_net[e[0]][e[1]]['label']!='E']
-
-count = 0
-num_nets = 1
-while(count<num_nets):    
-    # Copy graph with shallow copy referencing data from original
-    # attributes are referenced but not the structure
-    new_network = synth_net.__class__()
-    new_network.add_nodes_from(prim_nodes)
-    new_network.add_edges_from(prim_edges)
+def get_new(graph,sub):
+    """
+    Gets a new network from the original synthetic distribution network by 
+    swapping an edge with a minimum length reconnection. The created network is
+    rejected if power flow is not satisfied.
+    """
+    prim_nodes = [n for n in graph if graph.nodes[n]['label']!='H']
+    prim_edges = [e for e in graph.edges() \
+                  if graph[e[0]][e[1]]['label']!='S']
     
-    # Select edge at random from the primary network
+    # Reconstruct primary network
+    new_graph = graph.__class__()
+    new_graph.add_nodes_from(prim_nodes)
+    new_graph.add_edges_from(prim_edges)
     
+    # Get edgelist for random sampling and remove an edge
+    edgelist = [e for e in prim_edges if graph[e[0]][e[1]]['label']!='E']
     rand_edge = edgelist[np.random.choice(range(len(edgelist)))]
-    new_network.remove_edge(*rand_edge)
+    new_graph.remove_edge(*rand_edge)
     
-    # Get the end point unconnected to root node
-    # end node: node connected to root
-    # other node: node unconnected to root
-    # Note that connected node must be a transformer node
-    if nx.has_path(new_network,sub,rand_edge[0]):
+    # Get node labels for the edge: end_node is connected to root
+    if nx.has_path(new_graph,sub,rand_edge[0]):
         end_node = rand_edge[0]
     else:
         end_node = rand_edge[1]
     other_node = rand_edge[0] if end_node==rand_edge[1] else rand_edge[1]
-    if synth_net.nodes[end_node]['label']=='R':
-        print("Leaf node is road node. Choose another edge.")
+    
+    if graph.nodes[end_node]['label']=='R':
+        # print("Leaf node is road node. Choose another edge.")
+        return graph,0
     else:
-        print("Found an edge")
-        # Connect the unconnected node to another nearby node
-        comps = list(nx.connected_components(new_network))
+        # print("Found a suitable edge to remove. Proceeding...")
+        comps = list(nx.connected_components(new_graph))
         connected_nodes = list(comps[0]) \
-            if end_node in list(comps[0]) else list(comps[1])
-        dict_node = {n:synth_net.nodes[n]['cord'] for n in connected_nodes \
+                if end_node in list(comps[0]) else list(comps[1])
+        dict_node = {n:graph.nodes[n]['cord'] for n in connected_nodes \
                      if n!=end_node}
-        center_node = synth_net.nodes[other_node]['cord']
+        center_node = graph.nodes[other_node]['cord']
         near_node = find_nearest_node(center_node,dict_node)
         new_edge = (near_node,other_node)
-        new_network.add_edge(*new_edge)
-        count += 1
-        create_network(new_network,synth_net)
-        # powerflow(new_network)
-        # plot_network(new_network,with_secnet=True,
-        #              path=figpath+'ensemble-'+str(count)+'-')
-        # nx.write_gpickle(new_network,
-        #                  outpath+str(sub)+'-ensemble-'+str(count)+'.gpickle')
+        new_graph.add_edge(*new_edge)
+        create_network(new_graph,graph)
+        
+        # print("Checking power flow result...")
+        powerflow(new_graph)
+        voltage = [new_graph.nodes[n]['voltage'] for n in new_graph \
+                   if new_graph.nodes[n]['label']!='H']
+        low_voltage_nodes = [v for v in voltage if v<=0.87]
+        check = (len(low_voltage_nodes)/len(voltage))*100.0
+        if check>5.0:
+            print("Many nodes have low voltage. Percentage:",check)
+            return graph,0
+        else:
+            print("Acceptable power flow results. Percentage:",check)
+            return new_graph,1
 
 
 
+
+#%% Create networks
+count = 0
+num_nets = 1000
+while count < num_nets:
+    if count == 0:
+        new_graph,flag = get_new(synth_net,sub)
+    else:
+        new_graph,flag = get_new(new_graph,sub)
+    count += flag
+    if flag == 1:
+        nx.write_gpickle(new_graph,
+                     outpath+str(sub)+'-ensemble-'+str(count)+'.gpickle')
+        # plot_network(new_graph,with_secnet=False,
+        #               path=figpath+'ensemble-'+str(count)+'-')
 
 
 
