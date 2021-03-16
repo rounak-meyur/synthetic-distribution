@@ -1,13 +1,13 @@
+updates
 primnet/out
 secnet/out
 auxillary/out
 ensemble/out
 input
 libs/__pycache__
-validate/updates
 secnet/.ipynb_checkpoints
 primnet/.ipynb_checkpoints
-validate/.ipynb_checkpoints
 auxillary/.ipynb_checkpoints
 libs/.ipynb_checkpoints
 ensemble/.ipynb_checkpoints
+compare/.ipynb_checkpoints
