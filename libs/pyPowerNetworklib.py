@@ -8,6 +8,7 @@ Created on Wed Jan 13 22:30:39 2021
 import networkx as nx
 import geopandas as gpd
 from shapely.geometry import Point
+from pyGeometrylib import Link
 
 
 def GetDistNet(path,code):
@@ -76,6 +77,14 @@ def get_geometry(path,area):
     # Create actual graph network
     act_graph = nx.Graph()
     act_graph.add_edges_from(edgelist)
+    
+    # Compute edge lengths
+    geo_length = {}
+    for e in edgelist:
+        edge = str(e[0])+'_'+str(e[1])
+        edge_geom = df_lines.loc[df_lines.ID == edge]['geometry'].values[0]
+        geo_length[e] = Link(edge_geom).geod_length
+    nx.set_edge_attributes(act_graph,geo_length,'geo_length')
 
     # Get coordinate limits
     busgeom = df_buses['geometry']

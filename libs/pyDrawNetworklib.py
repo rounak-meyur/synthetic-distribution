@@ -121,7 +121,7 @@ def color_nodes(net,inset={},path=None):
     df_nodes.plot(ax=ax,column='voltage',markersize=40.0,cmap=cm.plasma,
                   vmin=0.80,vmax=1.05,cax=cax,legend=True)
     cax.set_ylabel("Voltage(in pu)",fontsize=30)
-    cax.tick_params(labelsize=20)
+    cax.tick_params(labelsize=30)
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
     
     

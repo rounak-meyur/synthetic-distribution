@@ -1,5 +1,5 @@
 #!/bin/sh
-for i in 121144 147793 148717
+for i in 150723 150724
 do
     echo "#!/bin/sh">>ensjob.sbatch
     echo "#SBATCH --export=NONE">>ensjob.sbatch

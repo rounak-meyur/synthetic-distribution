@@ -7,45 +7,40 @@ Description: Creates the secondary distribution network in a given county.
 """
 
 import sys,os
-import pandas as pd
 import networkx as nx
 import datetime,time
 
-workPath = os.getcwd()
-inpPath = workPath + "/input/"
-libPath = workPath + "/Libraries/"
+workpath = os.getcwd()
+libpath = workpath + "/Libraries/"
 # Load scratchpath
-scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
-inpPath = scratchPath + "/input/"
-tmpPath = scratchPath + "/temp/"
+scratchpath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
+inppath = scratchpath + "/input/"
+tmppath = scratchpath + "/temp/"
 
-sys.path.append(libPath)
+sys.path.append(libpath)
 from pyExtractDatalib import GetRoads,GetHomes
-from pyBuildSecNetlib import MapLink,SecNet
+from pyBuildSecNetlib import MapLink
 from pyBuildSecNetlib import MeasureDistance as dist
+from pyBuildSecNetlib import groups
+from pyBuildSecNetlib import generate_optimal_topology as generate
 
 #%% Data Extraction
 # Extract residence and road network information for the fiscode
 fiscode = sys.argv[1]
-roads = GetRoads(inpPath,fis=fiscode)
-homes = GetHomes(inpPath,fis=fiscode)
+dirname = 'sec-network/'
+roads = GetRoads(inppath,fis=fiscode)
+homes = GetHomes(inppath,fis=fiscode)
 
 #%% Mapping
 # Map the residence to nearest road network link
-MapLink(roads).map_point(homes,path=tmpPath+'sec-network/',fiscode=fiscode)
+H2Link = MapLink(roads).map_point(homes,path=tmppath+dirname,fiscode=fiscode)
 print("DONE MAPPING")
 
-# Extract the mapping data
-df_hmap = pd.read_csv(tmpPath+'sec-network/'+fiscode+'-home2link.csv')
-H2Link = dict([(t.hid, (t.source, t.target)) for t in df_hmap.itertuples()])
-
-#%% Creation of Network
-secnet_obj = SecNet(homes,roads,H2Link)
-L2Home = secnet_obj.link_to_home
-
+#%% Reverse Mapping
+L2Home = groups(H2Link)
 links = [l for l in L2Home if 0<len(L2Home[l])]
 linkdata = '\n'.join([','.join([str(x) for x in link])+'\t'+','.join([str(h) for h in L2Home[link]]) for link in links])
-with open(tmpPath+'sec-network/'+fiscode+'-link2home.txt','w') as f:
+with open(tmppath+dirname+fiscode+'-link2home.txt','w') as f:
     f.write(linkdata)
 
 #%% Create secondary network
@@ -53,18 +48,22 @@ prefix = '51'+fiscode
 suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
 count = 5000001
 
-for link in links:    
+for link in links:
+    # Get the link geometry and home data
+    linkgeom = roads.edges[link]['geometry']
+    dict_homes = {h:{'cord':homes.cord[h],'load':homes.average[h]} \
+              for h in L2Home[link]}
     # Solve the optimization problem and generate forest
     start_time = time.time()
-    if len(L2Home[link])>150: 
-        forest,roots = secnet_obj.generate_optimal_topology(link,minsep=50,hops=80,
-                                tsfr_max=100,heuristic=5,path=tmpPath)
-    elif len(L2Home[link])>80: 
-        forest,roots = secnet_obj.generate_optimal_topology(link,minsep=50,hops=40,
-                                tsfr_max=60,heuristic=15,path=tmpPath)
+    if len(homes)>150:
+        forest,roots = generate(linkgeom,dict_homes,minsep=50,hops=80,
+                                tsfr_max=100,heuristic=5,path=tmppath)
+    elif len(homes)>80: 
+        forest,roots = generate(linkgeom,dict_homes,minsep=50,hops=40,
+                                tsfr_max=60,heuristic=15,path=tmppath)
     else:
-        forest,roots = secnet_obj.generate_optimal_topology(link,minsep=50,hops=10,
-                                tsfr_max=25,heuristic=None,path=tmpPath)
+        forest,roots = generate(linkgeom,dict_homes,minsep=50,hops=10,
+                                tsfr_max=25,heuristic=None,path=tmppath)
     end_time = time.time()
     
     # Additional network data
@@ -87,7 +86,9 @@ for link in links:
     
     # Get edgelist for primary network design
     start_tsf = dict_tsfr[tsfrlist[0]][:2]
-    if dist(start_tsf,roads.cord[link[0]])<dist(start_tsf,roads.cord[link[1]]):
+    road_cord1 = [roads.nodes[link[0]]['x'],roads.nodes[link[0]]['y']]
+    road_cord2 = [roads.nodes[link[1]]['x'],roads.nodes[link[1]]['y']]
+    if dist(start_tsf,road_cord1)<dist(start_tsf,road_cord2):
         start = link[0]; end = link[1]
     else:
         start = link[1]; end = link[0]
@@ -116,16 +117,16 @@ for link in links:
     time_data = str(len(L2Home[link]))+'\t'+str(end_time-start_time)+'\n'
     
     # Append network data to file
-    dirname = 'sec-network/'
-    with open(tmpPath+dirname+fiscode+"-sec-dist.txt",'a') as f_network:
+    
+    with open(tmppath+dirname+fiscode+"-sec-dist.txt",'a') as f_network:
         f_network.write(network)
     # Append edge data to file
-    with open(tmpPath+dirname+fiscode+"-tsfr-net.csv",'a') as f_edge:
+    with open(tmppath+dirname+fiscode+"-tsfr-net.csv",'a') as f_edge:
         f_edge.write(edgelist_data)
     # Append transformer data to file
-    with open(tmpPath+dirname+fiscode+"-tsfr-data.csv",'a') as f_tsfr:
+    with open(tmppath+dirname+fiscode+"-tsfr-data.csv",'a') as f_tsfr:
         f_tsfr.write(tsfr_data)
     # Append transformer data to file
-    with open(tmpPath+dirname+fiscode+"-time-stat.txt",'a') as f_time:
+    with open(tmppath+dirname+fiscode+"-time-stat.txt",'a') as f_time:
         f_time.write(time_data)
 

@@ -7,16 +7,21 @@ Created on Thu Nov 26 19:50:33 2020
 
 # Get list of substations
 import os
-# Load scratchpath
-scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
-inpPath = scratchPath + "/input/"
-tmpPath = scratchPath + "/temp/"
 
-filelist = [f for f in os.listdir(tmpPath+'prim-master') \
+
+# Load scratchpath
+scratchpath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
+inppath = scratchpath + "/input/"
+tmppath = scratchpath + "/temp/"
+
+
+filelist = [f for f in os.listdir(tmppath+'osm-prim-master') \
             if f.endswith('-master.gpickle')]
-print(len(filelist))
 sublist = [f.split('-')[0] for f in filelist]
-print(len(sublist))
-data = ' '.join(sublist)
-with open(inpPath+'sublist.txt','w') as f:
+sublist = sorted([int(x) for x in sublist])
+
+
+
+data = ' '.join([str(x) for x in sublist])
+with open(inppath+'osm-sublist.txt','w') as f:
     f.write(data)

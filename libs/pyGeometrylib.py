@@ -78,6 +78,18 @@ class Grid(Polygon):
                 self.south_edge))
 
 #%% Functions
+def MeasureDistance(pt1,pt2):
+    '''
+    Measures the geodesic distance between two coordinates. The format of each point 
+    is (longitude,latitude).
+    pt1: (longitude,latitude) of point 1
+    pt2: (longitude,latitude) of point 2
+    '''
+    lon1,lat1 = pt1
+    lon2,lat2 = pt2
+    geod = Geodesic.WGS84
+    return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
+    
 def partitions(limits,kx,ky,x0=0,y0=0):
     """
     kx,ky: number of demarcations along x and y axes.

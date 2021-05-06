@@ -27,6 +27,7 @@ scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
 inpPath = scratchPath + "/input/"
 figPath = scratchPath + "/figs/"
 tmpPath = scratchPath + "/temp/"
+dirname = 'osm-master-graph/'
 
 #%% Pre-processing step
 
@@ -35,12 +36,12 @@ with open(inpPath+'fislist.txt') as f:
     areas = f.readlines()[0].strip('\n').split(' ')
 
 # Extract all substations in the region
-subs = GetSubstations(inpPath,areas=areas)
+subs = GetSubstations(inpPath)
 
 # Compose the total master graph of road and transformer nodes
 G = nx.Graph()
 for a in areas:
-    g = nx.read_gpickle(tmpPath+'master-graph/'+a+'-graph.gpickle')
+    g = nx.read_gpickle(tmpPath+dirname+a+'-graph.gpickle')
     G = nx.compose(G,g)
 
 # Create the partition
@@ -72,6 +73,6 @@ for sub in S2Node:
     sub_data = substation(id=sub,cord=subs.cord[sub],
                           nodes=S2Node[sub],nearest=S2Near[sub])
     sub_graph = get_subgraph(G,sub_data)
-    nx.write_gpickle(sub_graph,tmpPath+'prim-master/'+str(sub)+'-master.gpickle')
+    nx.write_gpickle(sub_graph,tmpPath+'osm-prim-master/'+str(sub)+'-master.gpickle')
     
 

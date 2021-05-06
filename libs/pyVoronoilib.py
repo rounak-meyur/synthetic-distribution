@@ -76,57 +76,6 @@ def find_nearest_node(center_cord,node_cord):
     matches = idx.intersect(center_bd)
     closest_node = min(matches,key=lambda i: nodes[i][0].distance(pt_center))
     return nodes[closest_node][-1]
-    
-
-def create_master_graph(roads,tsfr,links):
-    """
-    Creates the master graph consisting of all possible edges from the road
-    network links. Each node in the graph has a spatial attribute called
-    cord.
-    
-    roads:
-        TYPE: namedtuple
-        DESCRIPTION: road network data
-    tsfr:
-        TYPE: namedtuple
-        DESCRIPTION: local transformer data
-    
-    """
-    road_edges = list(roads.graph.edges())
-    tsfr_edges = list(tsfr.graph.edges())
-    for edge in links:
-        if edge in road_edges:
-            road_edges.remove(edge)
-        elif (edge[1],edge[0]) in road_edges:
-            road_edges.remove((edge[1],edge[0]))
-    edgelist = road_edges + tsfr_edges
-    graph = nx.Graph()
-    graph.add_edges_from(edgelist)
-    nodelist = list(graph.nodes())
-    
-    # Coordinates of nodes in network
-    nodepos = {n:roads.cord[n] if n in roads.cord else tsfr.cord[n] for n in nodelist}
-    nx.set_node_attributes(graph,nodepos,name='cord')
-    
-    # Length of edges
-    edge_length = {e:MeasureDistance(nodepos[e[0]],nodepos[e[1]]) \
-                    for e in edgelist}
-    nx.set_edge_attributes(graph,edge_length,name='length')
-    
-    # Label the nodes in network
-    node_label = {n:'T' if n in tsfr.cord else 'R' for n in list(graph.nodes())}
-    nx.set_node_attributes(graph,node_label,'label')
-    
-    # Add load at local transformer nodes
-    node_load = {n:tsfr.load[n] if node_label[n]=='T' else 0.0 \
-                 for n in list(graph.nodes())}
-    nx.set_node_attributes(graph,node_load,'load')
-    
-    # Add the associated secondary network for each local transformer
-    sec_net = {n:tsfr.secnet[n] if node_label[n]=='T' else nx.Graph() \
-                 for n in list(graph.nodes())}
-    nx.set_node_attributes(graph,sec_net,'secnet')
-    return graph
 
 def get_nearest_road(subs,graph):
     """

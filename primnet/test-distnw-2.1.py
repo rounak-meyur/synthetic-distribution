@@ -14,7 +14,7 @@ rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 inppath = rootpath + "/input/"
 figpath = workpath + "/figs/"
-distpath = workpath + "/out/prim-network/"
+distpath = workpath + "/out/"
 
 
 sys.path.append(libpath)

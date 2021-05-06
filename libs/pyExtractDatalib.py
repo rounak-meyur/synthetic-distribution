@@ -14,6 +14,7 @@ import sys
 import numpy as np
 import pandas as pd
 import geopandas as gpd
+import osmnx as ox
 import networkx as nx
 from shapely.geometry import LineString,Point
 from collections import namedtuple as nt
@@ -62,6 +63,8 @@ def MeasureDistance(pt1,pt2):
     geod = Geodesic.WGS84
     return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
 
+
+#%% Navteq HERE data
 def combine_components(graph,cords,radius = 0.01):
     """
     Combines network components by finding nearest nodes
@@ -175,10 +178,116 @@ def GetRoads(path,fis,level=[1,2,3,4,5],thresh=0):
     # Join disconnected components in the road network
     new_edges = combine_components(graph,roadcord,radius=0.1)
     graph.add_edges_from(new_edges)
+    
+    # Update graph attributes
     datalink.update({edge:{'level':5,'geometry':LineString([tuple(roadcord[r]) \
                       for r in list(edge)])} for edge in new_edges})
-    road = nt("road",field_names=["graph","cord","links"])
-    return road(graph=graph,cord=roadcord,links=datalink)
+    road_x = {r:roadcord[r][0] for r in graph}
+    road_y = {r:roadcord[r][1] for r in graph}
+    edge_geom = {e:datalink[e]['geometry'] for e in datalink}
+    
+    nx.set_node_attributes(graph,road_x,'x')
+    nx.set_node_attributes(graph,road_y,'y')
+    nx.set_edge_attributes(graph,edge_geom,'geometry')
+    return graph
+
+
+#%% Open Street Maps data
+def combine_osm_components(road,radius = 0.01):
+    """
+    Combines network components by finding nearest nodes
+    based on a QD Tree Approach.
+
+    Parameters
+    ----------
+    graph : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    # Initialize QD Tree
+    longitudes = [road.nodes[n]['x'] for n in road.nodes()]
+    latitudes = [road.nodes[n]['y'] for n in road.nodes()]
+    xmin = min(longitudes); xmax = max(longitudes)
+    ymin = min(latitudes); ymax = max(latitudes)
+    bbox = (xmin,ymin,xmax,ymax)
+    idx = Index(bbox)
+    
+    # Differentiate large and small components
+    comps = [c for c in list(nx.connected_components(road))]
+    lencomps = [len(c) for c in list(nx.connected_components(road))]
+    indlarge = lencomps.index(max(lencomps))
+    node_main = list(road.subgraph(comps[indlarge]).nodes())
+    del(comps[indlarge])
+    
+    # keep track of nodes so we can recover them later
+    nodes = []
+    
+    # create bounding box around each point in large component
+    for i,node in enumerate(node_main):
+        pt = Point([road.nodes[node]['x'],road.nodes[node]['y']])
+        pt_bounds = pt.x-radius, pt.y-radius, pt.x+radius, pt.y+radius
+        idx.insert(i, pt_bounds)
+        nodes.append((pt, pt_bounds, node))
+        
+    # find intersection and add edges
+    edgelist = []
+    for c in comps:
+        node_comp = list(road.subgraph(c).nodes())
+        nodepairs = []
+        for n in node_comp:
+            pt = Point([road.nodes[n]['x'],road.nodes[n]['y']])
+            pt_bounds = pt.x-radius, pt.y-radius, pt.x+radius, pt.y+radius
+            matches = idx.intersect(pt_bounds)
+            closest_pt = min(matches,key=lambda i: nodes[i][0].distance(pt))
+            nodepairs.append((n,nodes[closest_pt][-1]))
+        
+        # Get the geodesic distance
+        dist = [MeasureDistance([road.nodes[p[0]]['x'],road.nodes[p[0]]['y']],
+                                [road.nodes[p[1]]['x'],road.nodes[p[1]]['y']]) \
+                for p in nodepairs]
+        edgelist.append(nodepairs[np.argmin(dist)]+tuple([0]))
+    return edgelist
+
+
+def GetOSMRoads(path,fis,statefp="51"):
+    county_file = "tl_2018_us_county.shp"
+    data_counties = gpd.read_file(path+"census/"+county_file)
+    data_va = data_counties.loc[data_counties["STATEFP"]==statefp]
+    
+    # Get the OSM links within the county polygon
+    county_polygon = list(data_va[data_va.COUNTYFP==fis].geometry.items())[0][1]
+    osm_graph = ox.graph_from_polygon(county_polygon, retain_all=True,
+                                  truncate_by_edge=True)
+    
+    G = osm_graph.to_undirected()
+    
+    # Add geometries for links without it
+    edge_nogeom = [e for e in G.edges(keys=True) if 'geometry' not in G.edges[e]]
+    for e in edge_nogeom:
+        pts = [(G.nodes[e[0]]['x'],G.nodes[e[0]]['y']),
+               (G.nodes[e[1]]['x'],G.nodes[e[1]]['y'])]
+        link_geom = LineString(pts)
+        G.edges[e]['geometry'] = link_geom
+    
+    # Join disconnected components in the road network
+    new_edges = combine_osm_components(G,radius=0.1)
+    G.add_edges_from(new_edges)
+    for i,e in enumerate(new_edges):
+        pts = [(G.nodes[e[0]]['x'],G.nodes[e[0]]['y']),
+               (G.nodes[e[1]]['x'],G.nodes[e[1]]['y'])]
+        link_geom = LineString(pts)
+        G.edges[e]['geometry'] = link_geom
+        G.edges[e]['length'] = Link(link_geom).geod_length
+        G.edges[e]['oneway'] = float('nan')
+        G.edges[e]['highway'] = 'extra'
+        G.edges[e]['name'] = 'extra'
+        G.edges[e]['osmid'] = fis+str(80000+i)
+    return G
+    
 
 def GetHomes(path,fis):
     '''
@@ -196,9 +305,10 @@ def GetHomes(path,fis):
     return homes
 
 
-def GetSubstations(path,areas=['121'],state_fis='51',
+def GetSubstations(path,areas=None,state_fis='51',
                    sub_file='Electric_Substations.shp',
-                    county_file='tl_2018_us_county.shp'):
+                    county_file='tl_2018_us_county.shp',
+                    state_file = 'states.shp'):
     """
     Gets the list of substations within the area polygons
     
@@ -227,18 +337,23 @@ def GetSubstations(path,areas=['121'],state_fis='51',
     """
     subs = nt("substation",field_names=["cord"])
     data_substations = gpd.read_file(path+'eia/'+sub_file)
-    data_counties = gpd.read_file(path+'eia/'+county_file)
+    data_counties = gpd.read_file(path+'census/'+county_file)
+    data_states = gpd.read_file(path+'census/'+state_file)
     
-    data_county_state = data_counties.loc[data_counties['STATEFP']==state_fis]
-    dict_cord = {}
-    for area in areas:
-        county_polygon = \
-            list(data_county_state[data_county_state.COUNTYFP == area].geometry.items())[0][1]
-        df_subs = data_substations.loc[data_substations.geometry.within(county_polygon)]
-        cord = dict([(t.ID, (t.LONGITUDE, t.LATITUDE)) \
-                     for t in df_subs.itertuples()])
-        cord = {int(k):cord[k] for k in cord}
-        dict_cord.update(cord)
+    if areas == None:
+        state_polygon = list(data_states[data_states.STATE_FIPS == state_fis].geometry.items())[0][1]
+        df_subs = data_substations.loc[data_substations.geometry.within(state_polygon)]
+        cord = dict([(t.ID, (t.LONGITUDE, t.LATITUDE)) for t in df_subs.itertuples()])
+        dict_cord = {int(k):cord[k] for k in cord}
+    else:
+        dict_cord = {}
+        data_county_state = data_counties.loc[data_counties['STATEFP']==state_fis]
+        for area in areas:
+            county_polygon = list(data_county_state[data_county_state.COUNTYFP == area].geometry.items())[0][1]
+            df_subs = data_substations.loc[data_substations.geometry.within(county_polygon)]
+            cord = dict([(t.ID, (t.LONGITUDE, t.LATITUDE)) for t in df_subs.itertuples()])
+            cord = {int(k):cord[k] for k in cord}
+            dict_cord.update(cord)
     return subs(cord=dict_cord)
 
 
@@ -246,12 +361,12 @@ def GetTransformers(path,fis,homes):
     """
     Gets the network of local transformers in the county/city
     """
-    df_tsfr = pd.read_csv(path+'sec-network/'+fis+'-tsfr-data.csv',
+    df_tsfr = pd.read_csv(path+fis+'-tsfr-data.csv',
                           header=None,names=['tid','long','lat','load'])
     tsfr = nt("Transformers",field_names=["cord","load","graph","secnet"])
     dict_cord = dict([(t.tid, (t.long, t.lat)) for t in df_tsfr.itertuples()])
     dict_load = dict([(t.tid, t.load) for t in df_tsfr.itertuples()])
-    df_tsfr_edges = pd.read_csv(path+'sec-network/'+fis+'-tsfr-net.csv',
+    df_tsfr_edges = pd.read_csv(path+fis+'-tsfr-net.csv',
                                 header=None,names=['source','target'])
     g = nx.from_pandas_edgelist(df_tsfr_edges)
     secnet = GetSecnet(path,fis,homes)
@@ -276,7 +391,7 @@ def GetMappings(path,fis):
         list of edges formated as tuples.
 
     """
-    with open(path+'sec-network/'+fis+'-link2home.txt') as f:
+    with open(path+fis+'-link2home.txt') as f:
         lines = f.readlines()
     edgedata = [line.strip('\n').split('\t')[0] for line in lines]
     links = [tuple([int(x) for x in edge.split(',')]) for edge in edgedata]
@@ -303,7 +418,7 @@ def GetVASubstations(path,sub_file='Electric_Substations.shp',
     """
     subs = nt("substation",field_names=["cord"])
     data_substations = gpd.read_file(path+'eia/'+sub_file)
-    data_states = gpd.read_file(path+'eia/'+state_file)
+    data_states = gpd.read_file(path+'census/'+state_file)
     
     state_polygon = list(data_states[data_states.STATE_ABBR == 
                               'VA'].geometry.items())[0][1]
@@ -328,7 +443,7 @@ def GetSecnet(path,fis,homes):
     nodepos = {}
     edgelist = []
     
-    with open(path+'sec-network/'+str(fis)+'-sec-dist.txt','r') as f:
+    with open(path+str(fis)+'-sec-dist.txt','r') as f:
         lines = f.readlines()
     for line in lines:
         data = line.strip('\n').split('\t')

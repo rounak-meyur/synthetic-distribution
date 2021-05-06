@@ -20,7 +20,7 @@ workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
-distpath = rootpath + "/primnet/out/prim-network/"
+distpath = rootpath + "/primnet/out/osm-primnet/"
 outpath = workpath + "/out/"
 sys.path.append(libpath)
 
@@ -75,10 +75,10 @@ org_voltage = {n:synth_net.nodes[n]['voltage'] for n in synth_net.nodes}
 plot_network(synth_net,with_secnet=True,path=figpath+str(sub)+'-org-net-')
 color_nodes(synth_net,path=figpath+str(sub)+'-orgvolt-')
 color_edges(synth_net,path=figpath+str(sub)+'-orgflow-')
-
+sys.exit(0)
 
 #%% Hop distribution
-num_nets = 20
+num_nets = 4
 net_length = []
 voltage = []
 flows = []
@@ -179,7 +179,7 @@ ax.set_yticklabels(["{:.1f}".format(100.0*i) for i in labels])
 
 
 #%% Plot new network
-i = 20
+i = 1
 suffix = str(sub)+'-'+str(i)
 tree = nx.read_gpickle(outpath+str(sub)+'-ensemble-'+str(i)+'.gpickle')
 plot_network(tree,with_secnet=True,path=figpath+'mc-net-'+suffix)
@@ -188,4 +188,65 @@ color_edges(tree,path=figpath+'mc-flow-'+suffix)
 
 #%%
 sns.kdeplot(Hops[0],shade=False,color='red')
-sns.kdeplot(Hops[5],shade=False,color='blue')
+sns.kdeplot(Hops[1],shade=False,color='blue')
+sns.kdeplot(Hops[2],shade=False,color='green')
+sns.kdeplot(Hops[3],shade=False,color='magenta')
+sns.kdeplot(Hops[4],shade=False,color='black')
+
+#%% Plot network
+from matplotlib.collections import PolyCollection
+from pyGeometrylib import partitions
+import geopandas as gpd
+
+def DrawNodes(graph,ax,color='orangered',size=1.0):
+    """
+    Get the node geometries in the network graph for the specified node label.
+    """
+    d = {'nodes':graph.nodes(),
+         'geometry':[Point(graph.nodes[n]['cord']) for n in graph.nodes()]}
+    df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    df_nodes.plot(ax=ax,color=color,markersize=size)
+    return
+
+def DrawEdges(graph,ax,color='orangered',width=1.0):
+    """
+    """
+    d = {'edges':graph.edges(),
+         'geometry':[graph[e[0]][e[1]]['geometry'] for e in graph.edges()]}
+    df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    df_edges.plot(ax=ax,edgecolor=color,linewidth=width)
+    return
+
+def get_polygon(boundary):
+    """Gets the vertices for the boundary polygon"""
+    vert1 = [boundary.west_edge,boundary.north_edge]
+    vert2 = [boundary.east_edge,boundary.north_edge]
+    vert3 = [boundary.east_edge,boundary.south_edge]
+    vert4 = [boundary.west_edge,boundary.south_edge]
+    return np.array([vert1,vert2,vert3,vert4])
+
+cords = np.array([list(synth_net.nodes[n]['cord']) for n in synth_net])
+LEFT,BOTTOM = np.min(cords,0)
+RIGHT,TOP = np.max(cords,0)
+gridlist = partitions((LEFT,RIGHT,BOTTOM,TOP),5,5)
+
+
+DPI = 72    
+fig = plt.figure(figsize=(700/DPI, 500/DPI), dpi=DPI)
+ax = plt.subplot()
+ax.set_xlim(LEFT,RIGHT)
+ax.set_ylim(BOTTOM,TOP)
+
+# Get the boxes for the valid comparisons
+verts_valid = [get_polygon(bound) for i,bound in enumerate(gridlist)]
+c = PolyCollection(verts_valid,edgecolor='black',facecolor='white')
+ax.add_collection(c)
+
+i = 4
+suffix = str(sub)+'-'+str(i)
+tree = nx.read_gpickle(outpath+str(sub)+'-ensemble-'+str(i)+'.gpickle')
+DrawNodes(tree,ax,color='black')
+DrawEdges(tree,ax,color='black')
+
+ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+fig.savefig("{}{}.png".format(figpath,str(sub)+'-ens-'+str(i)),bbox_inches='tight')

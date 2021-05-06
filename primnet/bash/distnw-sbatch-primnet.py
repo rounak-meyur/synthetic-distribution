@@ -30,13 +30,11 @@ scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
 inpPath = scratchPath + "/input/"
 figPath = scratchPath + "/figs/"
 tmpPath = scratchPath + "/temp/"
+dirname = 'osm-prim-master/'
 
-# Extract the arealist
-with open(inpPath+'fislist.txt') as f:
-    areas = f.readlines()[0].strip('\n').split(' ')
 
 # Extract all substations in the region
-subs = GetSubstations(inpPath,areas=areas)
+subs = GetSubstations(inpPath)
 
 
 sub=int(sys.argv[1])
@@ -45,13 +43,14 @@ sub_data = substation(id=sub,cord=subs.cord[sub])
 
 # Generate primary distribution network by partitions
 start_time = time.time()
-P = Primary(sub_data,tmpPath)
-print("Master graph loaded and partitioned")
+P = Primary(sub_data,tmpPath+dirname)
+
+
 prim_net = P.get_sub_network(grbpath=tmpPath)
 end_time = time.time()
 time_taken = end_time - start_time
 prim_net = powerflow(prim_net)
-with open(tmpPath+'prim-time.txt','a') as f:
+with open(tmpPath+'osm-prim-time.txt','a') as f:
     f.write(sys.argv[1]+'\t'+str(time_taken)+'\n')
 
 try:
@@ -60,4 +59,4 @@ try:
 except:
     print("No cycles found!!!")
 
-nx.write_gpickle(prim_net,tmpPath+'prim-network/'+str(sub)+'-prim-dist.gpickle')
+nx.write_gpickle(prim_net,tmpPath+'osm-prim-network/'+str(sub)+'-prim-dist.gpickle')

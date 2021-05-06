@@ -49,7 +49,8 @@ def read_master_graph(path,sub):
             load: load at the transformer nodes
             length: geodesic length of the edges
     """
-    graph = nx.read_gpickle(path+'prim-master/'+sub+'-master.gpickle')
+    graph = nx.read_gpickle(path+sub+'-master.gpickle')
+    print("Master graph read from stored gpickle file")
     return graph
 
 def powerflow(graph):
@@ -359,6 +360,7 @@ class Primary:
         self.secnet = nx.get_node_attributes(master,'secnet')
         self.max_mva = max([feedcap,M/div])
         self.get_partitions(master)
+        print("Master graph partitioned")
         return
     
     def get_partitions(self,graph_list):

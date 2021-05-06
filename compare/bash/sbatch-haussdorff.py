@@ -7,6 +7,9 @@ Created on Thu Jan 21 15:38:51 2021
 
 import os,sys
 import matplotlib.pyplot as plt
+import networkx as nx
+import geopandas as gpd
+import threading
 import numpy as np
 from matplotlib.collections import PolyCollection
 import matplotlib.cm as cm
@@ -17,77 +20,104 @@ from pygeodesy import hausdorff_
 workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
-scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/graph-comp"
-actpath = scratchPath + "/actual/"
+scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
+
+figpath = scratchPath + "/figs/"
+synpath = scratchPath + "/temp/prim-network/"
+enspath = scratchPath + "/temp/ensemble/"
 
 
-
-workpath = os.getcwd()
-libpath = workpath + "/libs/"
-figpath = workpath + "/figs/"
-actpath = workpath + "/actual/"
-synpath = workpath + "/synthetic/"
-
-sys.path.append(libpath)
-from pyPowerNetworklib import GetDistNet,get_areadata,plot_network
 from pyGeometrylib import Link,partitions,geodist
+from pyPowerNetworklib import GetDistNet
 print("Imported modules")
 
 
-
-
-sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
-       150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
-       150727, 150728]
-synth_net = GetDistNet(synpath,sublist)
+sub = sys.argv[1]
+net = sys.argv[2]
+synth_net = GetDistNet(synpath,sub)
+ensem_net = nx.read_gpickle(enspath+str(sub)+'-ensemble-'+str(net)+'.gpickle')
 print("Synthetic network extracted")
 
-#%% Area specifications
-#areas = {'patrick_henry':194,'mcbryde':9001,'hethwood':7001}
-areas = {'patrick_henry':194,'mcbryde':9001}
+#%% Network data
+cords = np.array([list(synth_net.nodes[n]['cord']) for n in synth_net])
+LEFT,BOTTOM = np.min(cords,0)
+RIGHT,TOP = np.max(cords,0)
 
-area_data = {area:get_areadata(actpath,area,root,synth_net) \
-                      for area,root in areas.items()}
-
-# Get limits for the geographical region
-lims = np.empty(shape=(len(area_data),4))
-for i,area in enumerate(area_data):
-    lims[i,:] = np.array(area_data[area]['limits'])
-LEFT = np.min(lims[:,0]); RIGHT = np.max(lims[:,1])
-BOTTOM = np.min(lims[:,2]); TOP = np.max(lims[:,3])
-
-#%% Get edges within grid
-act_edges = [g for area in area_data \
-             for g in area_data[area]['df_lines']['geometry'].tolist()]
-syn_edges = [g for area in area_data \
-             for g in area_data[area]['df_synth']['geometry'].tolist()]
-
-
-gridlist = partitions((LEFT,RIGHT,BOTTOM,TOP),7,7)
-grid = gridlist[8]
-
+syn_edges = [synth_net.edges[e]['geometry'] for e in synth_net.edges()]
+ens_edges = [ensem_net.edges[e]['geometry'] for e in ensem_net.edges()]
 
 
 #%% Plot the grid
-C_vals = []
-for grid in gridlist:
-    print(grid)
-    act_edges_pts = [p for geom in act_edges \
-                     for p in Link(geom).InterpolatePoints() \
-                         if geom.within(grid) or geom.intersects(grid.exterior)]
-    syn_edges_pts = [p for geom in syn_edges \
-                     for p in Link(geom).InterpolatePoints() \
-                         if geom.within(grid) or geom.intersects(grid.exterior)]
-    
-    if len(act_edges_pts) != 0 and len(syn_edges_pts) != 0:
-        C_vals.append(hausdorff(syn_edges_pts,act_edges_pts,radius=0.001))
-    else:
-        C_vals.append(np.nan)
+s = 2
+C_vals = {}
 
-C_masked = np.ma.array(C_vals, mask=np.isnan(C_vals))
+# process: 
+def process(items, start, end):
+    for grid in items[start:end]:
+        ens_edges_pts = [p for geom in ens_edges \
+                         for p in Link(geom).InterpolatePoints(sep=s) \
+                             if geom.within(grid) or \
+                                 geom.intersects(grid.exterior)]
+        syn_edges_pts = [p for geom in syn_edges \
+                         for p in Link(geom).InterpolatePoints(sep=s) \
+                             if geom.within(grid) or \
+                                 geom.intersects(grid.exterior)]
+        print(grid)
+        if len(ens_edges_pts) != 0 and len(syn_edges_pts) != 0:
+            C_vals[grid] = hausdorff_(syn_edges_pts,ens_edges_pts,
+                                      distance=geodist).hd
+        else:
+            C_vals[grid] = np.nan
+        
+
+def split_processing(items, num_splits=5):
+    split_size = len(items) // num_splits
+    threads = []
+    for i in range(num_splits):
+        # determine the indices of the list this thread will handle
+        start = i * split_size
+        # special case on the last chunk to account for uneven splits
+        end = None if i+1 == num_splits else (i+1) * split_size
+        # create the thread
+        threads.append(
+            threading.Thread(target=process, args=(items, start, end)))
+        threads[-1].start() # start the thread we just created
+
+    # wait for all threads to finish
+    for t in threads:
+        t.join()
+    return
+
+# Make partition and compute hausdorff distance
+gridlist = partitions((LEFT,RIGHT,BOTTOM,TOP),5,5)
+split_processing(gridlist)
+C = []
+for grid in gridlist: C.append(C_vals[grid])
+C_masked = np.ma.array(C, mask=np.isnan(C))
 
 #%% Plot the spatial distribution
-colormap = cm.BrBG
+from shapely.geometry import Point
+def DrawNodes(graph,ax,color='orangered',size=1.0):
+    """
+    Get the node geometries in the network graph for the specified node label.
+    """
+    d = {'nodes':graph.nodes(),
+         'geometry':[Point(graph.nodes[n]['cord']) for n in graph.nodes()]}
+    df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    df_nodes.plot(ax=ax,color=color,markersize=size)
+    return
+
+def DrawEdges(graph,ax,color='orangered',width=1.0):
+    """
+    """
+    d = {'edges':graph.edges(),
+         'geometry':[graph[e[0]][e[1]]['geometry'] for e in graph.edges()]}
+    df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    df_edges.plot(ax=ax,edgecolor=color,linewidth=width)
+    return
+
+
+colormap = cm.Greens
 def get_polygon(boundary):
     """Gets the vertices for the boundary polygon"""
     vert1 = [boundary.west_edge,boundary.north_edge]
@@ -117,29 +147,33 @@ verts_invalid = [get_polygon(bound) for i,bound in enumerate(gridlist) \
 c = PolyCollection(verts_invalid,hatch=r"./",facecolor='white',edgecolor='black')
 ax.add_collection(c)
 
-for area in area_data:
-    plot_network(ax,area_data[area]['df_lines'],area_data[area]['df_buses'],'orangered')
-    plot_network(ax,area_data[area]['df_synth'],area_data[area]['df_cords'],'blue')
+
+DrawNodes(ensem_net,ax,color='orangered')
+DrawNodes(synth_net,ax,color='blue')
+DrawEdges(ensem_net,ax,color='orangered')
+DrawEdges(synth_net,ax,color='blue')
+
 
 
 ax.set_xticks([])
 ax.set_yticks([])
 
 cobj = cm.ScalarMappable(cmap=colormap)
-cobj.set_clim(vmin=-100,vmax=100)
+cobj.set_clim(vmin=0.0,vmax=max(C_valid))
 cbar = fig.colorbar(cobj,ax=ax)
-cbar.set_label('Percentage Deviation',size=20)
+cbar.set_label('Hausdorff distance(in meters)',size=20)
 cbar.ax.tick_params(labelsize=20)
 
 leg_data = [Line2D([0], [0], color='orangered', markerfacecolor='orangered', 
-                   marker='o',markersize=10, label='Actual distribution network'),
+                   marker='o',markersize=10, label='Variant distribution network'),
             Line2D([0], [0], color='blue', markerfacecolor='blue',
-                   marker='o',markersize=10, label='Synthetic distribution network'),
+                   marker='o',markersize=10, label='Optimal distribution network'),
             Patch(facecolor='white', edgecolor='black', hatch="./",
                          label='Grids with no actual network data')]
 
-#ax.legend(handles=leg_data,loc='best',ncol=1,prop={'size': 8})
-
+ax.legend(handles=leg_data,loc='best',ncol=1,prop={'size': 8})
+fig.savefig("{}{}.png".format(figpath,'sep'+str(s)+'-hausdorff-5by5-comp-ens-'+str(net)),
+            bbox_inches='tight')
 
 
 

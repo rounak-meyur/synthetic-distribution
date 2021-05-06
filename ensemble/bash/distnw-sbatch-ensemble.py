@@ -14,14 +14,12 @@ from geographiclib.geodesic import Geodesic
 from math import log
 import threading
 
-workPath = os.getcwd()
-libPath = workPath + "/Libraries/"
-sys.path.append(libPath)
-
 # Load scratchpath
 scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
 tmppath = scratchPath + "/temp/"
-distpath = tmppath + "prim-network/"
+
+dirname = "osm-prim-network/"
+distpath = tmppath + dirname
 
 
 def GetDistNet(path,code):
@@ -58,9 +56,7 @@ def GetDistNet(path,code):
         graph = nx.read_gpickle(path+str(code)+'-prim-dist.gpickle')
     return graph
 
-# sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
-#        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
-#        150727, 150728]
+
 sub = int(sys.argv[1])
 synth_net = GetDistNet(distpath,sub)
 
@@ -291,10 +287,10 @@ def get_new(graph,sub):
 #%% Create networks
 # Markov chain initialized with the same graph M times 
 # and traversed over N iterations
-
+target = "osm-ensemble/"
 def process(items, start, end):
     for item in items[start:end]:
-        iterations = 100
+        iterations = 20
         try:
             count = 0
             while count < iterations:
@@ -305,7 +301,7 @@ def process(items, start, end):
                 count += flag
             # save the network
             nx.write_gpickle(new_graph,
-                             tmppath+str(sub)+'-ensemble-'+str(item+1)+'.gpickle')
+                             tmppath+target+str(sub)+'-ensemble-'+str(item+1)+'.gpickle')
         except Exception:
             print('error with item')
 
