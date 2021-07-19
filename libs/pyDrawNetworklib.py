@@ -104,7 +104,7 @@ def plot_network(net,inset={},path=None,with_secnet=False):
     return
 
 
-def color_nodes(net,inset={},path=None):
+def color_nodes(net,inset={},path=None,vmax=1.05):
     fig = plt.figure(figsize=(35,30),dpi=72)
     ax = fig.add_subplot(111)
     
@@ -119,7 +119,7 @@ def color_nodes(net,inset={},path=None):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.001)
     df_nodes.plot(ax=ax,column='voltage',markersize=40.0,cmap=cm.plasma,
-                  vmin=0.80,vmax=1.05,cax=cax,legend=True)
+                  vmin=0.80,vmax=vmax,cax=cax,legend=True)
     cax.set_ylabel("Voltage(in pu)",fontsize=30)
     cax.tick_params(labelsize=30)
     ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
@@ -140,13 +140,13 @@ def color_nodes(net,inset={},path=None):
                         for n in inset[sub]['graph'].nodes()]}
         df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
         df_nodes.plot(ax=axins,column='voltage',markersize=30.0,cmap=cm.plasma,
-                      vmin=0.80,vmax=1.05)
+                      vmin=0.80,vmax=vmax)
         axins.tick_params(bottom=False,left=False,
                           labelleft=False,labelbottom=False)
         mark_inset(ax, axins, loc1=inset[sub]['loc1'], loc2=inset[sub]['loc2'], 
                fc="none", ec="0.5")
     if path!=None:
-        fig.savefig("{}{}.png".format(path,'-51121-dist-voltage'),bbox_inches='tight')
+        fig.savefig("{}{}.png".format(path,'-dist-voltage'),bbox_inches='tight')
     return
 
 
@@ -193,5 +193,5 @@ def color_edges(net,inset={},path=None):
         mark_inset(ax, axins, loc1=inset[sub]['loc1'], loc2=inset[sub]['loc2'], 
                fc="none", ec="0.5")
     if path!=None:
-        fig.savefig("{}{}.png".format(path,'-51121-dist-flows'),bbox_inches='tight')
+        fig.savefig("{}{}.png".format(path,'-dist-flows'),bbox_inches='tight')
     return

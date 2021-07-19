@@ -9,6 +9,68 @@ import networkx as nx
 import geopandas as gpd
 from shapely.geometry import Point
 from pyGeometrylib import Link
+from math import exp
+
+
+
+def assign_linetype(graph):
+    prim_amps = {e:2.2*exp(graph[e[0]][e[1]]['flow'])/6.3 \
+                 for e in graph.edges if graph[e[0]][e[1]]['label']=='P'}
+    sec_amps = {e:1.5*exp(graph[e[0]][e[1]]['flow'])/0.12 \
+                for e in graph.edges if graph[e[0]][e[1]]['label']=='S'}
+    
+    
+    edge_name = {}
+    for e in graph.edges:
+        # names of secondary lines
+        if graph[e[0]][e[1]]['label']=='S':
+            if sec_amps[e]<=95:
+                edge_name[e] = 'OH_Voluta'
+                r = 0.661/57.6; x = 0.033/57.6
+            elif sec_amps[e]<=125:
+                edge_name[e] = 'OH_Periwinkle'
+                r = 0.416/57.6; x = 0.031/57.6
+            elif sec_amps[e]<=165:
+                edge_name[e] = 'OH_Conch'
+                r = 0.261/57.6; x = 0.03/57.6
+            elif sec_amps[e]<=220:
+                edge_name[e] = 'OH_Neritina'
+                r = 0.164/57.6; x = 0.03/57.6
+            elif sec_amps[e]<=265:
+                edge_name[e] = 'OH_Runcina'
+                r = 0.130/57.6; x = 0.029/57.6
+            else:
+                edge_name[e] = 'OH_Zuzara'
+                r = 0.082/57.6; x = 0.027/57.6
+        
+        # names of primary lines
+        elif graph[e[0]][e[1]]['label']=='P':
+            if prim_amps[e]<=140:
+                edge_name[e] = 'OH_Swanate'
+                r = 0.407/39690; x = 0.113/39690
+            elif prim_amps[e]<=185:
+                edge_name[e] = 'OH_Sparrow'
+                r = 0.259/39690; x = 0.110/39690
+            elif prim_amps[e]<=240:
+                edge_name[e] = 'OH_Raven'
+                r = 0.163/39690; x = 0.104/39690
+            elif prim_amps[e]<=315:
+                edge_name[e] = 'OH_Pegion'
+                r = 0.103/39690; x = 0.0992/39690
+            else:
+                edge_name[e] = 'OH_Penguin'
+                r = 0.0822/39690; x = 0.0964/39690
+        else:
+            edge_name[e] = 'OH_Penguin'
+            r = 1e-10; x = 1e-10
+        
+        # Assign new resitance and reactance
+        graph[e[0]][e[1]]['r'] = r * graph.edges[e]['geo_length'] * 1e-3
+        graph[e[0]][e[1]]['x'] = x * graph.edges[e]['geo_length'] * 1e-3
+    
+    # Add new edge attribute
+    nx.set_edge_attributes(graph,edge_name,'type')
+    return
 
 
 def GetDistNet(path,code):

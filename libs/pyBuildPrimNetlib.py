@@ -68,9 +68,13 @@ def powerflow(graph):
     nodeload = nx.get_node_attributes(graph,'load')
     
     # Resistance data
-    edge_r = nx.get_edge_attributes(graph,'r')
-    R = np.diag([1.0/edge_r[e] if e in edge_r else 1.0/edge_r[(e[1],e[0])] \
-         for e in list(graph.edges())])
+    edge_r = []
+    for e in graph.edges:
+        try:
+            edge_r.append(1.0/graph.edges[e]['r'])
+        except:
+            edge_r.append(1.0/1e-14)
+    R = np.diag(edge_r)
     G = np.matmul(np.matmul(A,R),A.T)[node_ind,:][:,node_ind]
     p = np.array([1e-3*nodeload[n] for n in nodelist])
     
