@@ -9,13 +9,8 @@ stores information as a shape file for edgelist and nodelist
 """
 
 import sys,os
-import networkx as nx
-import numpy as np
-import matplotlib.pyplot as plt
 import geopandas as gpd
 from shapely.geometry import Point
-from matplotlib import cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
@@ -62,33 +57,6 @@ f_done = [int(f.strip('-prim-dist.gpickle')) for f in os.listdir(distpath)]
 for s in f_done:
     create_shapefile(s,shappath)
     print("Network created for",s)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

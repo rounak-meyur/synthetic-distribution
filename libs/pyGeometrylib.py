@@ -89,6 +89,10 @@ def MeasureDistance(pt1,pt2):
     lon2,lat2 = pt2
     geod = Geodesic.WGS84
     return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
+
+def geodist(geomA,geomB):
+    geod = Geodesic.WGS84
+    return geod.Inverse(geomA.y, geomA.x, geomB.y, geomB.x)['s12']
     
 def partitions(limits,kx,ky,x0=0,y0=0):
     """
@@ -130,41 +134,7 @@ def partitions(limits,kx,ky,x0=0,y0=0):
     return grid
 
 
-# def hausdorff(main_points,aux_points,radius=0.001):
-#     """
-#     Objective is to find the nearest point to the points in the aux_points set.
-#     The nearest point is to be identified among the points in the main_points
-#     set.
-#     """
-#     xpts = [p.x for p in main_points] + [p.x for p in aux_points]
-#     ypts = [p.y for p in main_points] + [p.y for p in aux_points]
-#     bbox = (min(xpts),min(ypts),max(xpts),max(ypts))
-#     idx = Index(bbox)
-    
-#     # keep track of points so we can recover them later
-#     points = []
-    
-#     # create bounding box around each point in main_points set
-#     for i,pt_main in enumerate(main_points):
-#         pt_bounds_main = pt_main.x-radius, pt_main.y-radius, \
-#             pt_main.x+radius, pt_main.y+radius
-#         idx.insert(i, pt_bounds_main)
-#         points.append((pt_main, pt_bounds_main))
-        
-#     # find intersection with bounding box around aux point set
-#     dist = []
-#     for pt_aux in aux_points:
-#         pt_bounds_aux = pt_aux.x-radius, pt_aux.y-radius, \
-#             pt_aux.x+radius, pt_aux.y+radius
-#         matches = idx.intersect(pt_bounds_aux)
-#         ind_closest = min(matches,key=lambda i: geodist(points[i][0],pt_aux))
-#         dist.append(geodist(points[ind_closest][0],pt_aux))
-#     return max(dist)
 
-
-def geodist(geomA,geomB):
-    geod = Geodesic.WGS84
-    return geod.Inverse(geomA.y, geomA.x, geomB.y, geomB.x)['s12']
 
 
 

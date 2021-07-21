@@ -57,10 +57,13 @@ def GetDistNet(path,code):
             geo_length: length of edge in meters
             flow: power flowing in kVA through edge
     """
-    graph = nx.Graph()
-    for c in code:
-        g = nx.read_gpickle(path+str(c)+'-distnet.gpickle')
-        graph = nx.compose(graph,g)
+    if type(code) == list:
+        graph = nx.Graph()
+        for c in code:
+            g = nx.read_gpickle(path+str(c)+'-prim-dist.gpickle')
+            graph = nx.compose(graph,g)
+    else:
+        graph = nx.read_gpickle(path+str(code)+'-prim-dist.gpickle')
     return graph
 
 
