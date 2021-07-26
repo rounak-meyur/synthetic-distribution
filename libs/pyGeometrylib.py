@@ -106,24 +106,17 @@ def partitions(limits,kx,ky,x0=0,y0=0):
     x_shift = x0*width
     y_shift = y0*height
     for t in range(kx):
-        xmin.append(LEFT+(t/kx)*(RIGHT-LEFT)+x_shift)
-        xmax.append(LEFT+((1+t)/kx)*(RIGHT-LEFT)+x_shift)
+        xmin.append(LEFT+(t/kx)*(RIGHT-LEFT))
+        xmax.append(LEFT+((1+t)/kx)*(RIGHT-LEFT))
     for t in range(ky):
-        ymin.append(BOTTOM+(t/ky)*(TOP-BOTTOM)+y_shift)
-        ymax.append(BOTTOM+((1+t)/ky)*(TOP-BOTTOM)+y_shift)
+        ymin.append(BOTTOM+(t/ky)*(TOP-BOTTOM))
+        ymax.append(BOTTOM+((1+t)/ky)*(TOP-BOTTOM))
     # For shifted origins
-    if x0>0:
-        xmax = [xmin[0]]+xmax
-        xmin = [LEFT]+xmin
-    if x0<0:
-        xmin = xmin+[xmax[-1]]
-        xmax = xmax+[RIGHT]
-    if y0>0:
-        ymax = [ymin[0]]+ymax
-        ymin = [BOTTOM]+ymin
-    if y0<0:
-        ymin = ymin+[ymax[-1]]
-        ymax = ymax+[TOP]
+    xmin = [xmin[0]] + [x+x_shift for x in xmin[1:]]
+    xmax = [x+x_shift for x in xmax[:-1]] + [xmax[-1]]
+    ymin = [ymin[0]] + [y+y_shift for y in ymin[1:]]
+    ymax = [y+y_shift for y in ymax[:-1]] + [ymax[-1]]
+    
     # get the grid polygons
     grid = []
     for i in range(len(xmin)):
@@ -132,31 +125,4 @@ def partitions(limits,kx,ky,x0=0,y0=0):
                         (xmax[i],ymax[j]),(xmin[i],ymax[j])]
             grid.append(Grid(vertices))
     return grid
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -19,11 +19,11 @@ libpath = rootpath + "/libs/"
 inppath = rootpath + "/input/"
 figpath = workpath + "/figs/"
 qgispath = inppath + "/actual/"
-distpath = rootpath + "/primnet/out/"
+distpath = rootpath + "/primnet/out/osm-primnet/"
 
 sys.path.append(libpath)
 from pyPowerNetworklib import get_areadata,GetDistNet,plot_network
-from pyExtractDatalib import GetRoads
+from pyExtractDatalib import GetOSMRoads
 print("Imported modules")
 
 
@@ -31,7 +31,7 @@ sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 14872
        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
        150727, 150728]
 synth_net = GetDistNet(distpath,sublist)
-roads = GetRoads(inppath,'121')
+roads = GetOSMRoads(inppath,'121')
 
 areas = {'patrick_henry':194,'mcbryde':9001,'hethwood':7001}
 # areas = {'patrick_henry':194,'mcbryde':9001}
@@ -52,11 +52,11 @@ ax.tick_params(bottom=False,left=False,labelleft=False,labelbottom=False)
 ymin,ymax = ax.get_ylim()
 xmin,xmax = ax.get_xlim()
 
-roadnodes = [n for n in roads.graph \
-             if xmin<=roads.cord[n][0]<=xmax \
-                 and ymin<=roads.cord[n][1]<=ymax]
+roadnodes = [n for n in roads if xmin<=roads.nodes[n]['x']<=xmax \
+                 and ymin<=roads.nodes[n]['y']<=ymax]
 
-nx.draw_networkx_edges(roads.graph,pos=roads.cord,ax=ax,
+nodepos = {n:[roads.nodes[n]['x'],roads.nodes[n]['y']] for n in roads}
+nx.draw_networkx_edges(roads,pos=nodepos,ax=ax,
                  style='dashed',width=0.8,edge_color='black')
 ax.set_xlim(xmin,xmax)
 ax.set_ylim(ymin,ymax)

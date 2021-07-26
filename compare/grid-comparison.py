@@ -2,7 +2,9 @@
 """
 Created on Thu Jan 14 21:16:52 2021
 
-@author: rouna
+Author: Rounak
+Description: Includes methods to compare pair of networks on the basis of 
+partitioning into multiple grids and comparing each grid.
 """
 
 import os,sys
@@ -10,8 +12,10 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 import geopandas as gpd
+from pygeodesy import hausdorff_
 from matplotlib.collections import PolyCollection
 import matplotlib.cm as cm
+import threading
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
@@ -25,7 +29,7 @@ synpath = rootpath + "/primnet/out/osm-primnet/"
 
 sys.path.append(libpath)
 from pyPowerNetworklib import GetDistNet,get_areadata,plot_network
-from pyGeometrylib import Grid,partitions,MeasureDistance
+from pyGeometrylib import Link,partitions,geodist
 print("Imported modules")
 
 
@@ -50,13 +54,17 @@ for i,area in enumerate(area_data):
     lims[i,:] = np.array(area_data[area]['limits'])
 LEFT = np.min(lims[:,0]); RIGHT = np.max(lims[:,1])
 BOTTOM = np.min(lims[:,2]); TOP = np.max(lims[:,3])
-width = RIGHT-LEFT
-height = TOP-BOTTOM
+
 
 act_nodes_geom = [g for area in area_data \
              for g in area_data[area]['df_buses']['geometry'].tolist()]
 synth_nodes_geom = [g for area in area_data \
              for g in area_data[area]['df_cords']['geometry'].tolist()]
+    
+act_edges = [g for area in area_data \
+             for g in area_data[area]['df_lines']['geometry'].tolist()]
+syn_edges = [g for area in area_data \
+             for g in area_data[area]['df_synth']['geometry'].tolist()]
 
 #%% Counter functions
 # Distribution of edges
@@ -83,7 +91,8 @@ def get_polygon(boundary):
     return np.array([vert1,vert2,vert3,vert4])
 
 
-def plot_deviation(gridlist,C_masked):
+def plot_deviation(gridlist,C_masked,colormap=cm.RdBu,
+                   vmin=-100.0,vmax=100.0,devname='Percentage Deviation'):
     x_array = np.array(sorted(list(set([g.west_edge for g in gridlist]\
                                        +[g.east_edge for g in gridlist]))))
     y_array = np.array(sorted(list(set([g.south_edge for g in gridlist]\
@@ -96,19 +105,16 @@ def plot_deviation(gridlist,C_masked):
     ax.set_ylim(BOTTOM,TOP)
     
     # Plot the grid colors
-    # colormap = cm.Greens
-    colormap = cm.RdBu
     ky = len(x_array) - 1
     kx = len(y_array) - 1
     
-    ax.pcolor(x_array,y_array,C_masked.reshape(kx,ky),cmap=colormap,
+    ax.pcolor(x_array,y_array,C_masked.reshape((kx,ky)).T,cmap=colormap,
               edgecolor='black')
     
     # Get the boxes for absent actual data
     verts_invalid = [get_polygon(bound) for i,bound in enumerate(gridlist) \
-                   if C_masked.mask[i]]
-    c = PolyCollection(verts_invalid,hatch=r"./",facecolor='white',
-                       edgecolor='black')
+                    if C_masked.mask[i]]
+    c = PolyCollection(verts_invalid,hatch=r"./",facecolor='white',edgecolor='black')
     ax.add_collection(c)
     
     # Plot the networks
@@ -123,9 +129,9 @@ def plot_deviation(gridlist,C_masked):
     ax.set_yticks([])
     
     cobj = cm.ScalarMappable(cmap=colormap)
-    cobj.set_clim(vmin=-100.0,vmax=100.0)
+    cobj.set_clim(vmin=vmin,vmax=vmax)
     cbar = fig.colorbar(cobj,ax=ax)
-    cbar.set_label('Percentage Deviation',size=20)
+    cbar.set_label(devname,size=20)
     cbar.ax.tick_params(labelsize=20)
     
     leg_data = [Line2D([0], [0], color='orangered', markerfacecolor='orangered', 
@@ -137,6 +143,16 @@ def plot_deviation(gridlist,C_masked):
     
     ax.legend(handles=leg_data,loc='best',ncol=1,prop={'size': 8})
     return fig
+
+#%% Spatial Node Distribution
+def get_suffix(delta):
+    if delta>0:
+        suf=str(int(abs(100*delta))) + 'pos'
+    elif delta<0:
+        suf=str(int(abs(100*delta))) + 'neg'
+    else:
+        suf='00'
+    return suf
 
 def node_stats(kx,ky,x0=0,y0=0):
     gridlist = partitions((LEFT,RIGHT,BOTTOM,TOP),kx,ky,x0=x0,y0=y0)
@@ -155,13 +171,72 @@ def node_stats(kx,ky,x0=0,y0=0):
     
     # Generate the plot
     fig = plot_deviation(gridlist,C_masked)
+    suffix = "-"+get_suffix(x0)+"-"+get_suffix(y0)
     fig.savefig("{}{}.png".format(figpath,
-        'spatial-comparison-'+str(kx)+'-'+str(ky)+'-xs-'+str(int(x0*100))+'-ys-'+str(int(y0*100))),
-        bbox_inches='tight')
+        'spatial-comparison-'+str(kx)+str(ky)+suffix),bbox_inches='tight')
     return C
 
 
+#%% Haussdorff Distance between networks
+def hauss_dist(kx,ky,x0=0,y0=0):
+    gridlist = partitions((LEFT,RIGHT,BOTTOM,TOP),kx,ky,x0=x0,y0=y0)
+    
+    # Compute Haussdorff distance
+    C = split_processing(gridlist)
+    C_vals = np.array([C[bound] for bound in gridlist])
+    C_masked = np.ma.array(C_vals, mask=np.isnan(C_vals))
+    # Generate the plot
+    fig = plot_deviation(gridlist,C_masked,colormap=cm.Greens,
+                         vmin=0.0,vmax=max(C_masked),
+                         devname="Haussdorff distance")
+    fig.savefig("{}{}.png".format(figpath,'hauss-comparison-'+str(kx)+'-'+str(ky)),
+        bbox_inches='tight')
+    return C
+
+# process: 
+def process(data, items, start, end):
+    s = 10
+    for grid in items[start:end]:
+        act_edges_pts = [p for geom in act_edges \
+                         for p in Link(geom).InterpolatePoints(sep=s) \
+                             if geom.within(grid) or \
+                                 geom.intersects(grid.exterior)]
+        syn_edges_pts = [p for geom in syn_edges \
+                         for p in Link(geom).InterpolatePoints(sep=s) \
+                             if geom.within(grid) or \
+                                 geom.intersects(grid.exterior)]
+        print(grid)
+        if len(act_edges_pts) != 0 and len(syn_edges_pts) != 0:
+            data[grid] = hausdorff_(act_edges_pts,syn_edges_pts,
+                                      distance=geodist).hd
+        else:
+            data[grid] = np.nan
+        
+
+def split_processing(items, num_splits=5):
+    split_size = len(items) // num_splits
+    threads = []
+    D = {}
+    for i in range(num_splits):
+        # determine the indices of the list this thread will handle
+        start = i * split_size
+        # special case on the last chunk to account for uneven splits
+        end = None if i+1 == num_splits else (i+1) * split_size
+        # create the thread
+        threads.append(
+            threading.Thread(target=process, args=(D, items, start, end)))
+        threads[-1].start() # start the thread we just created
+
+    # wait for all threads to finish
+    for t in threads:
+        t.join()
+    return D
+
+# C = hauss_dist(5,5)
+# sys.exit(0)
+
 #%% Generate the plots
-for s in [-0.2,-0.15,-0.1,-0.05,0,0.05,0.1,0.15,0.2]:
-    C = node_stats(7,7,x0=s)
+
+for s in [-0.15,-0.1,-0.05,0,0.05,0.1,0.15]:
+    C = node_stats(5,5,x0=s)
 

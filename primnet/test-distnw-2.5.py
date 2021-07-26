@@ -37,8 +37,7 @@ def create_shapefile(sub,path):
          'voltage':[net.nodes[n]['voltage'] for n in nodelist],
          'geometry':[Point(net.nodes[n]['cord']) for n in nodelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    gdf.to_file(path+str(sub)+"-nodelist.shp")
-    
+    gdf.to_file(path+str(sub)+"-nodelist.zip",driver='ESRI Shapefile')
     
     edgelist = net.edges
     d = {'label':[net.edges[e]['label'] for e in edgelist],
@@ -49,7 +48,7 @@ def create_shapefile(sub,path):
          'flow':[net.edges[e]['flow'] for e in edgelist],
          'geometry':[net.edges[e]['geometry'] for e in edgelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    gdf.to_file(path+str(sub)+"-edgelist.shp")
+    gdf.to_file(path+str(sub)+"-edgelist.zip",driver='ESRI Shapefile')
     return
 
 #%%
