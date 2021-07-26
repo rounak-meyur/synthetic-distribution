@@ -51,7 +51,6 @@ class Link(LineString):
             points.append(Point(xy))
         if len(points)==0: 
             points.append(Point((self.xy[0][0],self.xy[1][0])))
-        # return {i:[pt.x,pt.y] for i,pt in enumerate(MultiPoint(points))}
         return points
 
 

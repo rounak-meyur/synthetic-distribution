@@ -6,6 +6,7 @@ Created on Mon Sep 30 11:01:21 2019
 """
 import sys,os
 from geographiclib.geodesic import Geodesic
+from pyGeometrylib import MeasureDistance
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -19,18 +20,6 @@ import datetime
 
 
 #%% Functions
-
-def MeasureDistance(pt1,pt2):
-    '''
-    Measures the geodesic distance between two coordinates. The format of each point 
-    is (longitude,latitude).
-    pt1: (longitude,latitude) of point 1
-    pt2: (longitude,latitude) of point 2
-    '''
-    lon1,lat1 = pt1
-    lon2,lat2 = pt2
-    geod = Geodesic.WGS84
-    return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
 
 def groups(many_to_one):
     """Converts a many-to-one mapping into a one-to-many mapping.

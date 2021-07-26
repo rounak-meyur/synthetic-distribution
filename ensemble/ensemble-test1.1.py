@@ -23,41 +23,8 @@ outpath = workpath + "/out/"
 sys.path.append(libpath)
 
 
-from pyDrawNetworklib import plot_network, color_nodes, color_edges
+from pyExtractDatalib import GetDistNet
 
-def GetDistNet(path,code):
-    """
-    Read the txt file containing the edgelist of the generated synthetic network and
-    generates the corresponding networkx graph. The graph has the necessary node and
-    edge attributes.
-    
-    Inputs:
-        path: name of the directory
-        code: substation ID or list of substation IDs
-        
-    Output:
-        graph: networkx graph
-        node attributes of graph:
-            cord: longitude,latitude information of each node
-            label: 'H' for home, 'T' for transformer, 'R' for road node, 
-                    'S' for subs
-            voltage: node voltage in pu
-        edge attributes of graph:
-            label: 'P' for primary, 'S' for secondary, 'E' for feeder lines
-            r: resistance of edge
-            x: reactance of edge
-            geometry: shapely geometry of edge
-            geo_length: length of edge in meters
-            flow: power flowing in kVA through edge
-    """
-    if type(code) == list:
-        graph = nx.Graph()
-        for c in code:
-            g = nx.read_gpickle(path+str(c)+'-prim-dist.gpickle')
-            graph = nx.compose(graph,g)
-    else:
-        graph = nx.read_gpickle(path+str(code)+'-prim-dist.gpickle')
-    return graph
 
 # sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
 #        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 

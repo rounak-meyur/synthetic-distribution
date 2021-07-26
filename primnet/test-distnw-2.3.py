@@ -21,8 +21,7 @@ distpath = workpath + "/out/"
 
 
 sys.path.append(libpath)
-from pyPowerNetworklib import GetDistNet
-from pyDrawNetworklib import plot_network, color_nodes, color_edges
+from pyExtractDatalib import GetDistNet
 print("Imported modules")
 
 

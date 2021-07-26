@@ -26,15 +26,10 @@ distpath = workpath + "/out/osm-primnet/"
 
 
 sys.path.append(libpath)
-from pyPowerNetworklib import GetDistNet,assign_linetype
-from pyBuildPrimNetlib import powerflow
-from pyDrawNetworklib import plot_network, color_nodes, color_edges
+from pyExtractDatalib import GetDistNet
+from pyBuildPrimNetlib import powerflow,assign_linetype
 print("Imported modules")
 
-
-# plot_network(synth_net,path=figpath+str(sub),with_secnet=True)
-# color_nodes(synth_net,path=figpath+str(sub))
-# color_edges(synth_net,path=figpath+str(sub))
 
 
 #%% PV Hosting capacity for random residences

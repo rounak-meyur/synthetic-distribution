@@ -8,12 +8,6 @@ Created on Thu Jan 14 21:16:52 2021
 import os,sys
 import networkx as nx
 import matplotlib.pyplot as plt
-import numpy as np
-import geopandas as gpd
-from matplotlib.collections import PolyCollection
-import matplotlib.cm as cm
-from matplotlib.lines import Line2D
-from matplotlib.patches import Patch
 
 
 workpath = os.getcwd()
@@ -25,8 +19,8 @@ synpath = rootpath + "/primnet/out/"
 enspath = workpath + "/out/"
 
 sys.path.append(libpath)
-from pyPowerNetworklib import GetDistNet,get_areadata,plot_network
-from pyGeometrylib import Grid,partitions,MeasureDistance
+from pyExtractDatalib import GetDistNet,get_areadata
+from pyGeometrylib import MeasureDistance
 print("Imported modules")
 
 

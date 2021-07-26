@@ -9,7 +9,6 @@ region. The centers are the substations and the transformer/road network nodes
 are partioned into connected graphs.
 """
 
-from geographiclib.geodesic import Geodesic
 import networkx as nx
 import numpy as np
 from pyqtree import Index
@@ -17,17 +16,6 @@ from scipy.spatial import cKDTree
 from shapely.geometry import Point
 import time
 
-def MeasureDistance(pt1,pt2):
-    '''
-    Measures the geodesic distance between two coordinates. The format of each point 
-    is (longitude,latitude).
-    pt1: (longitude,latitude) of point 1
-    pt2: (longitude,latitude) of point 2
-    '''
-    lon1,lat1 = pt1
-    lon2,lat2 = pt2
-    geod = Geodesic.WGS84
-    return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
 
 def bounds(pt,radius):
     """

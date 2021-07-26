@@ -3,10 +3,10 @@
 Created on Tue Jan 19 16:45:38 2021
 
 Author: Rounak
-Description: Functions to create network representations
+Description: Functions to create network representations and color graphs based
+on their attributes.
 """
 
-import sys
 from shapely.geometry import Point
 import numpy as np
 import geopandas as gpd
@@ -15,10 +15,10 @@ from matplotlib import cm
 from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.lines import Line2D
-
+from matplotlib.collections import PolyCollection
 
 #%% Network Geometries
-def DrawNodes(synth_graph,ax,label='T',color='green',size=25):
+def DrawNodes(synth_graph,ax,label=['S','T','H'],color='green',size=25):
     """
     Get the node geometries in the network graph for the specified node label.
     """
@@ -33,7 +33,7 @@ def DrawNodes(synth_graph,ax,label='T',color='green',size=25):
     df_nodes.plot(ax=ax,color=color,markersize=size)
     return
 
-def DrawEdges(synth_graph,ax,label='P',color='black',width=2.0):
+def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0):
     """
     """
     # Get the nodes for the specified label
@@ -46,6 +46,11 @@ def DrawEdges(synth_graph,ax,label='P',color='black',width=2.0):
     df_edges.plot(ax=ax,edgecolor=color,linewidth=width)
     return
 
+def plot_gdf(ax,df_edges,df_nodes,color):
+    """"""
+    df_edges.plot(ax=ax,edgecolor=color,linewidth=1.0)
+    df_nodes.plot(ax=ax,color=color,markersize=1)
+    return
 
 def plot_network(net,inset={},path=None,with_secnet=False):
     """
@@ -194,4 +199,53 @@ def color_edges(net,inset={},path=None):
                fc="none", ec="0.5")
     if path!=None:
         fig.savefig("{}{}.png".format(path,'-dist-flows'),bbox_inches='tight')
+    return
+
+#%% Plot the spatial distribution
+def get_polygon(boundary):
+    """Gets the vertices for the boundary polygon"""
+    vert1 = [boundary.west_edge,boundary.north_edge]
+    vert2 = [boundary.east_edge,boundary.north_edge]
+    vert3 = [boundary.east_edge,boundary.south_edge]
+    vert4 = [boundary.west_edge,boundary.south_edge]
+    return np.array([vert1,vert2,vert3,vert4])
+
+
+def plot_deviation(ax,gridlist,C_masked,colormap=cm.BrBG):
+    x_array = np.array(sorted(list(set([g.west_edge for g in gridlist]\
+                                       +[g.east_edge for g in gridlist]))))
+    y_array = np.array(sorted(list(set([g.south_edge for g in gridlist]\
+                                       +[g.north_edge for g in gridlist]))))
+    # Initialize figure
+    
+    LEFT = min(x_array); RIGHT = max(x_array)
+    BOTTOM = min(y_array); TOP = max(y_array)
+    ax.set_xlim(LEFT,RIGHT)
+    ax.set_ylim(BOTTOM,TOP)
+    
+    # Plot the grid colors
+    ky = len(x_array) - 1
+    kx = len(y_array) - 1
+    
+    ax.pcolor(x_array,y_array,C_masked.reshape((kx,ky)).T,cmap=colormap,
+              edgecolor='black')
+    
+    # Get the boxes for absent actual data
+    verts_invalid = [get_polygon(bound) for i,bound in enumerate(gridlist) \
+                    if C_masked.mask[i]]
+    c = PolyCollection(verts_invalid,hatch=r"./",facecolor='white',edgecolor='black')
+    ax.add_collection(c)
+    
+    # Plot the accessory stuff
+    ax.set_xticks([])
+    ax.set_yticks([])
+    return
+
+def add_colorbar(fig,ax,vmin=-100.0,vmax=100.0,
+                 colormap=cm.BrBG,devname="Percentage Deviation"):
+    cobj = cm.ScalarMappable(cmap=colormap)
+    cobj.set_clim(vmin=vmin,vmax=vmax)
+    cbar = fig.colorbar(cobj,ax=ax)
+    cbar.set_label(devname,size=20)
+    cbar.ax.tick_params(labelsize=20)
     return

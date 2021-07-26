@@ -5,29 +5,15 @@ Created on Mon Sep 30 11:01:21 2019
 @author: rounak
 """
 import sys
-from geographiclib.geodesic import Geodesic
 from shapely.geometry import LineString
 import networkx as nx
 import gurobipy as grb
 import numpy as np
-from math import log
+from math import log,exp
+from pyGeometrylib import MeasureDistance, Link
 
 
 #%% Functions
-
-def MeasureDistance(pt1,pt2):
-    '''
-    Measures the geodesic distance between two coordinates. The format of each point 
-    is (longitude,latitude).
-    pt1: (longitude,latitude) of point 1
-    pt2: (longitude,latitude) of point 2
-    '''
-    lon1,lat1 = pt1
-    lon2,lat2 = pt2
-    geod = Geodesic.WGS84
-    return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
-
-
 def read_master_graph(path,sub):
     """
     Reads the master graph from the binary/gpickle file.
@@ -90,6 +76,65 @@ def powerflow(graph):
     nx.set_edge_attributes(graph,flows,'flow')
     return graph
 
+def assign_linetype(graph):
+    prim_amps = {e:2.2*exp(graph[e[0]][e[1]]['flow'])/6.3 \
+                 for e in graph.edges if graph[e[0]][e[1]]['label']=='P'}
+    sec_amps = {e:1.5*exp(graph[e[0]][e[1]]['flow'])/0.12 \
+                for e in graph.edges if graph[e[0]][e[1]]['label']=='S'}
+    
+    
+    edge_name = {}
+    for e in graph.edges:
+        # names of secondary lines
+        if graph[e[0]][e[1]]['label']=='S':
+            if sec_amps[e]<=95:
+                edge_name[e] = 'OH_Voluta'
+                r = 0.661/57.6; x = 0.033/57.6
+            elif sec_amps[e]<=125:
+                edge_name[e] = 'OH_Periwinkle'
+                r = 0.416/57.6; x = 0.031/57.6
+            elif sec_amps[e]<=165:
+                edge_name[e] = 'OH_Conch'
+                r = 0.261/57.6; x = 0.03/57.6
+            elif sec_amps[e]<=220:
+                edge_name[e] = 'OH_Neritina'
+                r = 0.164/57.6; x = 0.03/57.6
+            elif sec_amps[e]<=265:
+                edge_name[e] = 'OH_Runcina'
+                r = 0.130/57.6; x = 0.029/57.6
+            else:
+                edge_name[e] = 'OH_Zuzara'
+                r = 0.082/57.6; x = 0.027/57.6
+        
+        # names of primary lines
+        elif graph[e[0]][e[1]]['label']=='P':
+            if prim_amps[e]<=140:
+                edge_name[e] = 'OH_Swanate'
+                r = 0.407/39690; x = 0.113/39690
+            elif prim_amps[e]<=185:
+                edge_name[e] = 'OH_Sparrow'
+                r = 0.259/39690; x = 0.110/39690
+            elif prim_amps[e]<=240:
+                edge_name[e] = 'OH_Raven'
+                r = 0.163/39690; x = 0.104/39690
+            elif prim_amps[e]<=315:
+                edge_name[e] = 'OH_Pegion'
+                r = 0.103/39690; x = 0.0992/39690
+            else:
+                edge_name[e] = 'OH_Penguin'
+                r = 0.0822/39690; x = 0.0964/39690
+        else:
+            edge_name[e] = 'OH_Penguin'
+            r = 1e-10; x = 1e-10
+        
+        # Assign new resitance and reactance
+        graph[e[0]][e[1]]['r'] = r * graph.edges[e]['geo_length'] * 1e-3
+        graph[e[0]][e[1]]['x'] = x * graph.edges[e]['geo_length'] * 1e-3
+    
+    # Add new edge attribute
+    nx.set_edge_attributes(graph,edge_name,'type')
+    return
+
 #%% Function for callback
 def mycallback(model, where):
     if where == grb.GRB.Callback.MIP:
@@ -127,36 +172,6 @@ def mycallback(model, where):
     return
 
 #%% Classes
-class Link(LineString):
-    """
-    Derived class from Shapely LineString to compute metric distance based on 
-    geographical coordinates over geometric coordinates.
-    """
-    def __init__(self,line_geom):
-        """
-        """
-        super().__init__(line_geom)
-        self.geod_length = self.__length()
-        return
-    
-    
-    def __length(self):
-        '''
-        Computes the geographical length in meters between the ends of the link.
-        '''
-        if self.geom_type != 'LineString':
-            print("Cannot compute length!!!")
-            return None
-        # Compute great circle distance
-        geod = Geodesic.WGS84
-        length = 0.0
-        for i in range(len(list(self.coords))-1):
-            lon1,lon2 = self.xy[0][i:i+2]
-            lat1,lat2 = self.xy[1][i:i+2]
-            length += geod.Inverse(lat1, lon1, lat2, lon2)['s12']
-        return length
-
-
 class MILP_primary:
     """
     Contains methods and attributes to generate the optimal primary distribution

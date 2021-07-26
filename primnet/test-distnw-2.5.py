@@ -22,8 +22,8 @@ shappath = workpath + "/out/prim-geom/"
 
 
 sys.path.append(libpath)
-from pyPowerNetworklib import GetDistNet,assign_linetype
-# from pyBuildPrimNetlib import powerflow
+from pyExtractDatalib import GetDistNet
+from pyBuildPrimNetlib import assign_linetype
 
 print("Imported modules")
 

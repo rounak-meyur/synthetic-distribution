@@ -9,7 +9,6 @@ import os,sys
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
-import geopandas as gpd
 from matplotlib.collections import PolyCollection
 import matplotlib.cm as cm
 from matplotlib.lines import Line2D
@@ -26,7 +25,8 @@ synpath = rootpath + "/primnet/out/"
 sys.path.append(libpath)
 from pyQuadTreelib import Point, Rect, QuadTree
 from pyGeometrylib import Link
-from pyPowerNetworklib import GetDistNet,get_areadata,plot_network
+from pyExtractDatalib import GetDistNet,get_areadata
+from pyDrawNetworklib import plot_gdf
 print("Imported modules")
 
 
@@ -140,8 +140,8 @@ ax.add_collection(c)
 qtree.draw(ax)
 
 for area in area_data:
-    plot_network(ax,area_data[area]['df_lines'],area_data[area]['df_buses'],'orangered')
-    plot_network(ax,area_data[area]['df_synth'],area_data[area]['df_cords'],'blue')
+    plot_gdf(ax,area_data[area]['df_lines'],area_data[area]['df_buses'],'orangered')
+    plot_gdf(ax,area_data[area]['df_synth'],area_data[area]['df_cords'],'blue')
 
 
 ax.set_xticks([])

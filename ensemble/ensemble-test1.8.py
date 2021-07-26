@@ -26,8 +26,7 @@ enspath = workpath + "/out/osm-ensemble/"
 
 
 sys.path.append(libpath)
-from pyPowerNetworklib import assign_linetype
-from pyBuildPrimNetlib import powerflow
+from pyBuildPrimNetlib import powerflow,assign_linetype
 
 print("Imported modules")
 
