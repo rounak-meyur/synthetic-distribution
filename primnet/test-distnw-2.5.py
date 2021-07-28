@@ -32,7 +32,8 @@ def create_shapefile(sub,path):
     net = GetDistNet(distpath,sub)
     assign_linetype(net)
     nodelist = net.nodes
-    d = {'label':[net.nodes[n]['label'] for n in nodelist],
+    d = {'node':[n for n in nodelist],
+        'label':[net.nodes[n]['label'] for n in nodelist],
          'load':[net.nodes[n]['load'] for n in nodelist],
          'voltage':[net.nodes[n]['voltage'] for n in nodelist],
          'geometry':[Point(net.nodes[n]['cord']) for n in nodelist]}
@@ -41,6 +42,8 @@ def create_shapefile(sub,path):
     
     edgelist = net.edges
     d = {'label':[net.edges[e]['label'] for e in edgelist],
+         'nodeA':[e[0] for e in edgelist],
+         'nodeB':[e[1] for e in edgelist],
          'line_type':[net.edges[e]['type'] for e in edgelist],
          'r':[net.edges[e]['r'] for e in edgelist],
          'x':[net.edges[e]['x'] for e in edgelist],
