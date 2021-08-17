@@ -76,10 +76,10 @@ def run_powerflow(sub,i,homes,rating):
 
 #%% Plot histogram of voltages
 from matplotlib.ticker import PercentFormatter,ScalarFormatter
-# sub = 147793
+sub = 147793
 # sub = 113088
 # sub = 121248
-sub = 121144
+# sub = 121144
 
 host = 3
 v_random1_mv = []; v_random2_mv = []; v_random3_mv = []
