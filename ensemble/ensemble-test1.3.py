@@ -2,7 +2,9 @@
 """
 Created on Wed Jan 27 20:10:18 2021
 
-@author: rouna
+Author: Rounak
+Description: Attempts to create ensemble of networks using constrained random hop
+starting from a node to be covered and reaching the root.
 """
 
 import sys,os

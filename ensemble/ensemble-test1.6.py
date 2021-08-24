@@ -2,7 +2,8 @@
 """
 Created on Wed Mar  3 11:43:38 2021
 
-@author: rouna
+@author: rounak
+Description: Compares between networks in an ensemble.
 """
 
 import sys,os
