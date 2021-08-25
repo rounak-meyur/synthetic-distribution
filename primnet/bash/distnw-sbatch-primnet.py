@@ -63,16 +63,16 @@ start_time = time.time()
 P = Primary(sub_data,tmpPath+dirname)
 
 
-synth_net = P.get_sub_network(grbpath=tmpPath)
+prim_net = P.get_sub_network(grbpath=tmpPath)
 end_time = time.time()
 time_taken = end_time - start_time
 
-remove_cycle(synth_net)
+remove_cycle(prim_net)
 
-prim_net = create_final_network(synth_net)
+synth_net = create_final_network(prim_net)
 with open(tmpPath+'osm-prim-time.txt','a') as f:
     f.write(sys.argv[1]+'\t'+str(time_taken)+'\n')
 
 
 
-nx.write_gpickle(prim_net,tmpPath+'osm-prim-network/'+str(sub)+'-prim-dist.gpickle')
+nx.write_gpickle(synth_net,tmpPath+'osm-prim-network/'+str(sub)+'-prim-dist.gpickle')

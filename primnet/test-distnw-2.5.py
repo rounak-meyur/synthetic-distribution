@@ -23,14 +23,12 @@ shappath = workpath + "/out/prim-geom/"
 
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet
-from pyBuildPrimNetlib import assign_linetype
 
 print("Imported modules")
 
 #%% Load a network and save as shape file
 def create_shapefile(sub,path):
     net = GetDistNet(distpath,sub)
-    assign_linetype(net)
     nodelist = net.nodes
     d = {'node':[n for n in nodelist],
         'label':[net.nodes[n]['label'] for n in nodelist],
