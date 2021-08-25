@@ -5,12 +5,12 @@ Created on Mon Sep 30 11:01:21 2019
 @author: rounak
 """
 import sys
-from shapely.geometry import LineString
+from shapely.geometry import LineString, MultiLineString
 import networkx as nx
 import gurobipy as grb
 import numpy as np
 from math import log,exp
-from pyGeometrylib import MeasureDistance, Link
+from pyGeometrylib import Link
 
 
 #%% Functions
@@ -51,7 +51,6 @@ def powerflow(graph):
     nodelist = [node for node in list(graph.nodes()) \
                 if graph.nodes[node]['label'] != 'S']
     edgelist = [edge for edge in list(graph.edges())]
-    nodeload = nx.get_node_attributes(graph,'load')
     
     # Resistance data
     edge_r = []
@@ -62,7 +61,7 @@ def powerflow(graph):
             edge_r.append(1.0/1e-14)
     R = np.diag(edge_r)
     G = np.matmul(np.matmul(A,R),A.T)[node_ind,:][:,node_ind]
-    p = np.array([1e-3*nodeload[n] for n in nodelist])
+    p = np.array([1e-3*graph.nodes[n]['load'] for n in nodelist])
     
     # Voltages and flows
     v = np.matmul(np.linalg.inv(G),p)
@@ -74,7 +73,7 @@ def powerflow(graph):
     for s in subnodes: voltage[s] = 1.0
     nx.set_node_attributes(graph,voltage,'voltage')
     nx.set_edge_attributes(graph,flows,'flow')
-    return graph
+    return
 
 def assign_linetype(graph):
     prim_amps = {e:2.2*exp(graph[e[0]][e[1]]['flow'])/6.3 \
@@ -128,8 +127,8 @@ def assign_linetype(graph):
             r = 1e-10; x = 1e-10
         
         # Assign new resitance and reactance
-        graph[e[0]][e[1]]['r'] = r * graph.edges[e]['geo_length'] * 1e-3
-        graph[e[0]][e[1]]['x'] = x * graph.edges[e]['geo_length'] * 1e-3
+        graph.edges[e]['r'] = r * graph.edges[e]['geo_length'] * 1e-3
+        graph.edges[e]['x'] = x * graph.edges[e]['geo_length'] * 1e-3
     
     # Add new edge attribute
     nx.set_edge_attributes(graph,edge_name,'type')
@@ -439,6 +438,7 @@ class Primary:
         for t in self.secnet:
             sec_net = nx.compose(sec_net,self.secnet[t])
         secondary = list(sec_net.edges())
+        
         secpos = nx.get_node_attributes(sec_net,'cord')
         seclabel = nx.get_node_attributes(sec_net,'label')
         secload = nx.get_node_attributes(sec_net,'resload')
@@ -466,40 +466,101 @@ class Primary:
         
         # Label edges of the created network
         feed_path = nx.get_node_attributes(self.graph,'feedpath')
-        edge_geom = {}
-        edge_label = {}
-        edge_r = {}
-        edge_x = {}
-        glength = {}
         for e in list(dist_net.edges()):
-            length = 1e-3 * MeasureDistance(nodepos[e[0]],nodepos[e[1]])
-            length = length if length != 0.0 else 1e-12
             if e in primary or (e[1],e[0]) in primary:
-                edge_geom[e] = LineString((nodepos[e[0]],nodepos[e[1]]))
-                edge_label[e] = 'P'
-                edge_r[e] = 0.8625/39690 * length
-                edge_x[e] = 0.4154/39690 * length
-                glength[e] = Link(edge_geom[e]).geod_length
+                dist_net.edges[e]['geometry'] = LineString((nodepos[e[0]],nodepos[e[1]]))
+                dist_net.edges[e]['label'] = 'P'
             elif e in hvlines or (e[1],e[0]) in hvlines:
                 rnode = e[0] if e[1]==self.subdata.id else e[1]
                 path_cords = [self.subdata.cord]+\
                                    [nodepos[nd] for nd in feed_path[rnode]]
-                edge_geom[e] = LineString(path_cords)
-                edge_label[e] = 'E'
-                edge_r[e] = 1e-12 * length
-                edge_x[e] = 1e-12 * length
-                glength[e] = Link(edge_geom[e]).geod_length
+                dist_net.edges[e]['geometry'] = LineString(path_cords)
+                dist_net.edges[e]['label'] = 'E'
             else:
-                edge_geom[e] = LineString((nodepos[e[0]],nodepos[e[1]]))
-                edge_label[e] = 'S'
-                edge_r[e] = 0.81508/57.6 * length
-                edge_x[e] = 0.3496/57.6 * length
-                glength[e] = Link(edge_geom[e]).geod_length
-        nx.set_edge_attributes(dist_net, edge_geom, 'geometry')
-        nx.set_edge_attributes(dist_net, edge_label, 'label')
-        nx.set_edge_attributes(dist_net, edge_r, 'r')
-        nx.set_edge_attributes(dist_net, edge_x, 'x')
-        nx.set_edge_attributes(dist_net,glength,'geo_length')
+                dist_net.edges[e]['geometry'] = LineString((nodepos[e[0]],nodepos[e[1]]))
+                dist_net.edges[e]['label'] = 'S'
         return dist_net
     
 
+def create_final_network(synth_net):
+    """
+    Creates the final version of the network with only the transformer nodes, 
+    substation node and the road nodes where the voltage regulator are placed.
+    The residence nodes are also connected to the transformer.
+
+    Parameters
+    ----------
+    path : string
+        path for the network gpickle file.
+    sub : integer
+        substation ID of the network.
+
+    Returns
+    -------
+    graph : networkx Graph
+        Final graph with all required edge and node properties.
+
+    """
+    # Load network created by optimization framework
+    sub = [n for n in synth_net if synth_net.nodes[n]['label']=='S'][0]
+    reg_nodes = list(nx.neighbors(synth_net, sub))
+    tnodes = [n for n in synth_net if synth_net.nodes[n]['label']=='T']
+    rnodes = [n for n in synth_net if synth_net.nodes[n]['label']=='R' and n not in reg_nodes]
+    
+    # Separate the secondary network edges
+    sec_edges = [e for e in synth_net.edges if synth_net.edges[e]['label']=='S']
+    
+    # Remove unnecessary road nodes
+    nodelist = [sub]
+    prim_edges = []
+    
+    for t in tnodes:
+        if t not in nodelist:
+            nodes = [v for v in nx.shortest_path(synth_net,sub,t) if v not in rnodes]
+            edges = [(nodes[i],nodes[i+1]) for i,_ in enumerate(nodes[:-1])]
+            nodelist.extend(nodes[1:])
+            prim_edges.extend(edges)
+    
+    # Construct final graph
+    graph = nx.Graph()
+    graph.add_edges_from(prim_edges+sec_edges)
+    
+    
+    # Add edge properties of primary network
+    for edge in prim_edges:
+        path = nx.shortest_path(synth_net,edge[0],edge[1])
+        path_geom = MultiLineString([synth_net[path[i]][path[i+1]]['geometry'] \
+                     for i,_ in enumerate(path[:-1])])
+        out_coords = [list(i.coords) for i in path_geom]
+        
+        # Edge data
+        graph.edges[edge]['geometry'] = LineString([i for sublist in out_coords for i in sublist])
+        graph.edges[edge]['geo_length'] = Link(graph.edges[edge]['geometry']).geod_length
+        if sub in edge:
+            graph.edges[edge]['label'] = 'E'
+            graph.edges[edge]['r'] = 1e-12 * graph.edges[edge]['geo_length']
+            graph.edges[edge]['x'] = 1e-12 * graph.edges[edge]['geo_length']
+        else:
+            graph.edges[edge]['label'] = 'P'
+            graph.edges[edge]['r'] = 0.8625/39690 * graph.edges[edge]['geo_length']
+            graph.edges[edge]['x'] = 0.4154/39690 * graph.edges[edge]['geo_length']
+    
+    # Add edge properties of secondary network
+    for edge in sec_edges:
+        graph.edges[edge]['geometry'] = synth_net.edges[edge]['geometry']
+        graph.edges[edge]['label'] = 'S'
+        graph.edges[edge]['geo_length'] = Link(graph.edges[edge]['geometry']).geod_length
+        graph.edges[edge]['r'] = 0.81508/57.6 * graph.edges[edge]['geo_length']
+        graph.edges[edge]['x'] = 0.3496/57.6 * graph.edges[edge]['geo_length']
+        
+    for n in graph.nodes:
+        graph.nodes[n]['cord'] = synth_net.nodes[n]['cord']
+        graph.nodes[n]['label'] = synth_net.nodes[n]['label']
+        graph.nodes[n]['load'] = synth_net.nodes[n]['load']
+    
+    # Run power flow and store the flows and voltages
+    powerflow(graph)
+    
+    # Assign line types
+    assign_linetype(graph)
+    return graph

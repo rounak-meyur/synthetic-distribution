@@ -38,7 +38,7 @@ workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
 from pyExtractDatalib import GetSubstations
-from pyBuildPrimNetlib import Primary,powerflow
+from pyBuildPrimNetlib import Primary,create_final_network
 
 
 
@@ -63,13 +63,13 @@ start_time = time.time()
 P = Primary(sub_data,tmpPath+dirname)
 
 
-prim_net = P.get_sub_network(grbpath=tmpPath)
+synth_net = P.get_sub_network(grbpath=tmpPath)
 end_time = time.time()
 time_taken = end_time - start_time
 
-remove_cycle(prim_net)
+remove_cycle(synth_net)
 
-prim_net = powerflow(prim_net)
+prim_net = create_final_network(synth_net)
 with open(tmpPath+'osm-prim-time.txt','a') as f:
     f.write(sys.argv[1]+'\t'+str(time_taken)+'\n')
 
