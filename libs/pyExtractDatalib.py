@@ -422,8 +422,27 @@ def GetSecnet(path,fis,homes):
     nx.set_node_attributes(secnet,dict_load,'resload')
     return secnet
 
+#%% Get road and transformer network (output of Step 1)
+def GetPrimRoad(path,code):
+    """
+    Extracts the road network with local transformer nodes.
+    
+    Inputs:
+        path: name of the directory
+        code: substation ID or list of substation IDs
+        
+    Output:
+        graph: networkx graph
+        node attributes of graph:
+            cord: longitude,latitude information of each node
+            label: 'T' for transformer, 'R' for road node
+        edge attributes of graph:
+            None
+    """
+    graph = nx.read_gpickle(path+str(code)+'-road.gpickle')
+    return graph
 
-#%% Get output synthetic networks
+#%% Get output synthetic networks (output of Step 2)
 def GetDistNet(path,code):
     """
     Read the txt file containing the edgelist of the generated synthetic network and
