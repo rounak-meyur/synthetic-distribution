@@ -18,6 +18,8 @@ from matplotlib.lines import Line2D
 from pyqtree import Index
 import threading
 
+
+
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
@@ -38,39 +40,27 @@ def create_network(graph,master):
     graph.add_edges_from(sec_edges)
     
     # node attributes
-    nodepos = {n:master.nodes[n]['cord'] for n in graph}
-    nodelab = {n:master.nodes[n]['label'] for n in graph}
-    nodeload = {n:master.nodes[n]['load'] for n in graph}
-    nx.set_node_attributes(graph,nodepos,'cord')
-    nx.set_node_attributes(graph,nodelab,'label')
-    nx.set_node_attributes(graph,nodeload,'load')
+    for n in graph:
+        graph.nodes[n]['cord'] = master.nodes[n]['cord']
+        graph.nodes[n]['load'] = master.nodes[n]['load']
+        graph.nodes[n]['label'] = master.nodes[n]['label']
     
     # edge attributes
-    edge_geom = {}
-    edge_label = {}
-    edge_r = {}
-    edge_x = {}
-    glength = {}
     for e in list(graph.edges()):
         if e in master.edges():
-            edge_geom[e] = master[e[0]][e[1]]['geometry']
-            edge_label[e] = master[e[0]][e[1]]['label']
-            edge_r[e] = master[e[0]][e[1]]['r']
-            edge_x[e] = master[e[0]][e[1]]['x']
-            glength[e] = master[e[0]][e[1]]['geo_length']   
+            graph.edges[e]['geometry'] = master[e[0]][e[1]]['geometry']
+            graph.edges[e]['geo_length'] = master[e[0]][e[1]]['geo_length']
+            graph.edges[e]['label'] = master[e[0]][e[1]]['label']
+            graph.edges[e]['r'] = master[e[0]][e[1]]['r']
+            graph.edges[e]['x'] = master[e[0]][e[1]]['x']
         else:
-            edge_geom[e] = LineString((nodepos[e[0]],nodepos[e[1]]))
-            glength[e] = Link(edge_geom[e]).geod_length
-            edge_label[e] = 'P'
-            length = glength[e] if glength[e] != 0.0 else 1e-12
-            edge_r[e] = 0.8625/39690 * length
-            edge_x[e] = 0.4154/39690 * length
-            
-    nx.set_edge_attributes(graph, edge_geom, 'geometry')
-    nx.set_edge_attributes(graph, edge_label, 'label')
-    nx.set_edge_attributes(graph, edge_r, 'r')
-    nx.set_edge_attributes(graph, edge_x, 'x')
-    nx.set_edge_attributes(graph, glength,'geo_length')
+            graph.edges[e]['geometry'] = LineString((master.nodes[e[0]]['cord'],
+                                                     master.nodes[e[1]]['cord']))
+            graph.edges[e]['geo_length'] = Link(graph.edges[e]['geometry']).geod_length
+            graph.edges[e]['label'] = 'P'
+            length = graph.edges[e]['geo_length'] if graph.edges[e]['geo_length'] != 0.0 else 1e-12
+            graph.edges[e]['r'] = 0.8625/39690 * length
+            graph.edges[e]['x'] = 0.4154/39690 * length
     return
 
 
@@ -81,33 +71,71 @@ def get_new(graph,road):
     rejected if power flow is not satisfied.
     """
     prim_nodes = [n for n in graph if graph.nodes[n]['label']!='H']
+    reg_nodes = [n for n in graph if graph.nodes[n]['label']=='R']
     prim_edges = [e for e in graph.edges() \
                   if graph[e[0]][e[1]]['label']!='S']
     sub = [n for n in graph if graph.nodes[n]['label']=='S'][0]
     
-    # Reconstruct primary network
+    # Reconstruct primary network to alter without modifying original
     new_graph = graph.__class__()
     new_graph.add_nodes_from(prim_nodes)
     new_graph.add_edges_from(prim_edges)
     
     # Get edgelist for random sampling and remove an edge
     edgelist = [e for e in prim_edges if graph.nodes[e[0]]['label']=='T' \
-                and graph.nodes[e[1]]['label']!='T']
+                and graph.nodes[e[1]]['label']=='T']
     rand_edge = edgelist[np.random.choice(range(len(edgelist)))]
+    rem_geom = graph.edges[rand_edge]['geometry']
     new_graph.remove_edge(*rand_edge)
     
-    # Get node labels for the edge: end_node is connected to root
-    if nx.has_path(new_graph,sub,rand_edge[0]):
-        end_node = rand_edge[0]
-        other_node = rand_edge[1]
-    else:
-        end_node = rand_edge[1]
-        other_node = rand_edge[0]
-    
     # Analyze the two disconnected components
+    target = rand_edge[1] if nx.has_path(new_graph,sub,rand_edge[0]) else rand_edge[0]
     comps = list(nx.connected_components(new_graph))
-    connected_nodes = list(comps[0]) \
-            if end_node in list(comps[0]) else list(comps[1])
+    if sub in list(comps[0]):
+        not_connected_nodes = list(comps[1])
+        connected_nodes = list(comps[0])
+    else:
+        not_connected_nodes = list(comps[0])
+        connected_nodes = list(comps[1])
+    
+    # Create a dummy road network
+    new_road = road.__class__()
+    new_road.add_nodes_from(road.nodes)
+    new_road.add_edges_from(road.edges)
+    for e in new_road.edges:
+        new_road.edges[e]['geometry'] = LineString([road.nodes[e[0]]['cord'],
+                                                    road.nodes[e[1]]['cord']])
+        new_road.edges[e]['length'] = Link(new_road.edges[e]['geometry']).geod_length
+        
+    # Delete the same edge/path from the dummy road network
+    path = [rand_edge[0],rand_edge[1]]
+    if len(rem_geom.coords)>2:
+        path_coords = list(rem_geom.coords)[1:-1]
+        for cord in path_coords:
+            neighbor_dist = {n: geodist(cord,road.nodes[n]['cord']) \
+                             for n in nx.neighbors(road,path[-2])}
+            node_in_path = min(neighbor_dist,key=neighbor_dist.get)
+            path.insert(-1,node_in_path)
+    rem_road_edge = [(path[i],path[i+1]) for i,_ in enumerate(path[:-1])]
+    for edge in rem_road_edge:
+        new_road.remove_edge(*edge)
+    
+    # Get edgeset
+    for n in not_connected_nodes:
+        circle = Point(graph.nodes[n]['cord']).buffer(0.01)
+        nearby_nodes = [m for m in connected_nodes \
+                        if Point(graph.nodes[m]['cord']).within(circle)]
+        
+        
+    
+    sys.exit(0)
+    
+    # Get the set of edges between the disconnected components
+    # edge_set = []
+    # for e in new_road:
+    #     if (e[0] in comps[0] and e[1] in comps[1]) or (e[0] in comps[1] and e[1] in comps[0]):
+            
+    
     # dict_node = {n:graph.nodes[n]['cord'] for n in connected_nodes \
     #              if n!=end_node}
     # center_node = graph.nodes[other_node]['cord']
@@ -130,9 +158,36 @@ def get_new(graph,road):
         return new_graph,1
 
 
+#%% Grow the network
+def base(graph,road):
+    edges = [e for e in graph.edges if graph.edges[e]['label']=='E']
+    net = graph.__class__()
+    net.add_nodes_from([n for n in graph.nodes if graph.nodes[n]['label'] in ['R','S']])
+    net.add_edges_from(edges)
+    
+    # Edge data
+    for e in net.edges:
+        net.edges[e]['geometry'] = graph[e[0]][e[1]]['geometry']
+        net.edges[e]['geo_length'] = graph[e[0]][e[1]]['geo_length']
+        net.edges[e]['label'] = graph[e[0]][e[1]]['label']
+        net.edges[e]['r'] = graph[e[0]][e[1]]['r']
+        net.edges[e]['x'] = graph[e[0]][e[1]]['x']
+    
+    # Node data
+    
+    
+    return net
+
+#%% Run the program
+
+
 sub = 121143
 synth_net = GetDistNet(distpath,sub)
 road_net = GetPrimRoad(tsfrpath,sub)
+
+
+
+get_new(synth_net,road_net)
 
 #%% Create networks
 # Markov chain initialized with the same graph M times 

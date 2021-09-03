@@ -10,7 +10,7 @@ creates a network consisting of transformer nodes.
 
 import sys,os
 import networkx as nx
-from shapely.geometry import LineString, MultiLineString
+from shapely.geometry import LineString
 
 workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
@@ -74,13 +74,9 @@ def create_final_network(path,sub):
     
     # Add edge properties of primary network
     for edge in prim_edges:
-        path = nx.shortest_path(synth_net,edge[0],edge[1])
-        path_geom = MultiLineString([synth_net[path[i]][path[i+1]]['geometry'] \
-                     for i,_ in enumerate(path[:-1])])
-        out_coords = [list(i.coords) for i in path_geom]
-        
         # Edge data
-        graph.edges[edge]['geometry'] = LineString([i for sublist in out_coords for i in sublist])
+        path = nx.shortest_path(synth_net,edge[0],edge[1])
+        graph.edges[edge]['geometry'] = LineString([synth_net.nodes[n]['cord'] for n in path])
         graph.edges[edge]['geo_length'] = Link(graph.edges[edge]['geometry']).geod_length
         if sub in edge:
             graph.edges[edge]['label'] = 'E'

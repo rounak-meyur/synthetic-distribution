@@ -90,6 +90,8 @@ def MeasureDistance(pt1,pt2):
     return geod.Inverse(lat1, lon1, lat2, lon2)['s12']
 
 def geodist(geomA,geomB):
+    if type(geomA) != Point: geomA = Point(geomA)
+    if type(geomB) != Point: geomB = Point(geomB)
     geod = Geodesic.WGS84
     return geod.Inverse(geomA.y, geomA.x, geomB.y, geomB.x)['s12']
     
