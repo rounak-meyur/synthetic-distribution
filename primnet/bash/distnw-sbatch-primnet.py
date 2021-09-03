@@ -38,7 +38,7 @@ workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
 from pyExtractDatalib import GetSubstations
-from pyBuildPrimNetlib import Primary,create_final_network
+from pyBuildPrimNetlib import Primary,powerflow,assign_linetype
 
 
 
@@ -69,10 +69,15 @@ time_taken = end_time - start_time
 
 remove_cycle(prim_net)
 
-synth_net = create_final_network(prim_net)
+# Run power flow and store the flows and voltages
+powerflow(prim_net)
+    
+# Assign line types
+assign_linetype(prim_net)
+
 with open(tmpPath+'osm-prim-time.txt','a') as f:
     f.write(sys.argv[1]+'\t'+str(time_taken)+'\n')
 
 
 
-nx.write_gpickle(synth_net,tmpPath+'osm-prim-network/'+str(sub)+'-prim-dist.gpickle')
+nx.write_gpickle(prim_net,tmpPath+'osm-prim-network/'+str(sub)+'-prim-dist.gpickle')
