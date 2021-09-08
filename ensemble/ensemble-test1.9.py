@@ -25,7 +25,7 @@ rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
 tsfrpath = rootpath + "/secnet/out/osm-prim-road/"
-distpath = rootpath + "/primnet/out/osm-primnet-final/"
+distpath = rootpath + "/primnet/out/osm-primnet/"
 outpath = workpath + "/out/osm-ensemble-mc/"
 sys.path.append(libpath)
 
@@ -161,8 +161,8 @@ def get_new(graph,road):
 #%% Grow the network
 def base(graph,road):
     edges = [e for e in graph.edges if graph.edges[e]['label']=='E']
+    sub = [n for n in graph if graph.nodes[n]['label']=='S'][0]
     net = graph.__class__()
-    net.add_nodes_from([n for n in graph.nodes if graph.nodes[n]['label'] in ['R','S']])
     net.add_edges_from(edges)
     
     # Edge data
@@ -174,9 +174,19 @@ def base(graph,road):
         net.edges[e]['x'] = graph[e[0]][e[1]]['x']
     
     # Node data
+    for n in net.nodes:
+        net.nodes[n]['cord'] = graph.nodes[n]['cord']
+        net.nodes[n]['load'] = graph.nodes[n]['load']
+        net.nodes[n]['label'] = graph.nodes[n]['label']
     
+    # BFS sort of nodes
+    S = list(nx.bfs_tree(graph,sub))
+    return net,S
+
+
+def grow(graph,road,nodelist):
     
-    return net
+    return
 
 #%% Run the program
 
@@ -185,7 +195,7 @@ sub = 121143
 synth_net = GetDistNet(distpath,sub)
 road_net = GetPrimRoad(tsfrpath,sub)
 
-
+sys.exit(0)
 
 get_new(synth_net,road_net)
 
