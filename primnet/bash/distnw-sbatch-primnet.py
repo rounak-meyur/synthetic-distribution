@@ -38,7 +38,8 @@ workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
 from pyExtractDatalib import GetSubstations
-from pyBuildPrimNetlib import Primary,powerflow,assign_linetype
+from pyBuildPrimNetlib import Primary
+from pyMiscUtilslib import powerflow,assign_linetype
 
 
 

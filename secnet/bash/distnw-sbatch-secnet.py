@@ -21,7 +21,7 @@ sys.path.append(libpath)
 from pyExtractDatalib import GetRoads,GetHomes
 from pyBuildSecNetlib import MapLink
 from pyBuildSecNetlib import MeasureDistance as dist
-from pyBuildSecNetlib import groups
+from pyMiscUtilslib import groups
 from pyBuildSecNetlib import generate_optimal_topology as generate
 
 #%% Data Extraction

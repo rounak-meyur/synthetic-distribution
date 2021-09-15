@@ -13,29 +13,9 @@ import pandas as pd
 from scipy.spatial import Delaunay
 from itertools import combinations
 from shapely.geometry import LineString,MultiPoint,LinearRing,Point
-from collections import defaultdict
 from pyqtree import Index
 import gurobipy as grb
 import datetime
-
-
-#%% Functions
-
-def groups(many_to_one):
-    """Converts a many-to-one mapping into a one-to-many mapping.
-
-    `many_to_one` must be a dictionary whose keys and values are all
-    :term:`hashable`.
-
-    The return value is a dictionary mapping values from `many_to_one`
-    to sets of keys from `many_to_one` that have that value.
-
-    """
-    one_to_many = defaultdict(set)
-    for v, k in many_to_one.items():
-        one_to_many[k].add(v)
-    D = dict(one_to_many)
-    return {k:list(D[k]) for k in D}
 
 #%% Function for callback
 def mycallback(model, where):

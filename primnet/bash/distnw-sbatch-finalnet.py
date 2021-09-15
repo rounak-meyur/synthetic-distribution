@@ -21,7 +21,7 @@ distpath = scratchPath + "/temp/osm-prim-network/"
 
 
 from pyExtractDatalib import GetDistNet
-from pyBuildPrimNetlib import assign_linetype, powerflow
+from pyMiscUtilslib import assign_linetype, powerflow
 from pyGeometrylib import Link
 
 print("Imported modules")

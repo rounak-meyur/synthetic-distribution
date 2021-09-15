@@ -9,7 +9,6 @@ from shapely.geometry import LineString
 import networkx as nx
 import gurobipy as grb
 import numpy as np
-from math import log,exp
 from pyGeometrylib import Link
 
 
@@ -38,101 +37,6 @@ def read_master_graph(path,sub):
     graph = nx.read_gpickle(path+sub+'-master.gpickle')
     print("Master graph read from stored gpickle file")
     return graph
-
-def powerflow(graph):
-    """
-    Checks power flow solution and save dictionary of voltages.
-    """
-    A = nx.incidence_matrix(graph,nodelist=list(graph.nodes()),
-                            edgelist=list(graph.edges()),oriented=True).toarray()
-    
-    node_ind = [i for i,node in enumerate(graph.nodes()) \
-                if graph.nodes[node]['label'] != 'S']
-    nodelist = [node for node in list(graph.nodes()) \
-                if graph.nodes[node]['label'] != 'S']
-    edgelist = [edge for edge in list(graph.edges())]
-    
-    # Resistance data
-    edge_r = []
-    for e in graph.edges:
-        try:
-            edge_r.append(1.0/graph.edges[e]['r'])
-        except:
-            edge_r.append(1.0/1e-14)
-    R = np.diag(edge_r)
-    G = np.matmul(np.matmul(A,R),A.T)[node_ind,:][:,node_ind]
-    p = np.array([1e-3*graph.nodes[n]['load'] for n in nodelist])
-    
-    # Voltages and flows
-    v = np.matmul(np.linalg.inv(G),p)
-    f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
-    voltage = {h:1.0-v[i] for i,h in enumerate(nodelist)}
-    flows = {e:log(abs(f[i])) for i,e in enumerate(edgelist)}
-    subnodes = [node for node in list(graph.nodes()) \
-                if graph.nodes[node]['label'] == 'S']
-    for s in subnodes: voltage[s] = 1.0
-    nx.set_node_attributes(graph,voltage,'voltage')
-    nx.set_edge_attributes(graph,flows,'flow')
-    return
-
-def assign_linetype(graph):
-    prim_amps = {e:2.2*exp(graph[e[0]][e[1]]['flow'])/6.3 \
-                 for e in graph.edges if graph[e[0]][e[1]]['label']=='P'}
-    sec_amps = {e:1.5*exp(graph[e[0]][e[1]]['flow'])/0.12 \
-                for e in graph.edges if graph[e[0]][e[1]]['label']=='S'}
-    
-    
-    edge_name = {}
-    for e in graph.edges:
-        # names of secondary lines
-        if graph[e[0]][e[1]]['label']=='S':
-            if sec_amps[e]<=95:
-                edge_name[e] = 'OH_Voluta'
-                r = 0.661/57.6; x = 0.033/57.6
-            elif sec_amps[e]<=125:
-                edge_name[e] = 'OH_Periwinkle'
-                r = 0.416/57.6; x = 0.031/57.6
-            elif sec_amps[e]<=165:
-                edge_name[e] = 'OH_Conch'
-                r = 0.261/57.6; x = 0.03/57.6
-            elif sec_amps[e]<=220:
-                edge_name[e] = 'OH_Neritina'
-                r = 0.164/57.6; x = 0.03/57.6
-            elif sec_amps[e]<=265:
-                edge_name[e] = 'OH_Runcina'
-                r = 0.130/57.6; x = 0.029/57.6
-            else:
-                edge_name[e] = 'OH_Zuzara'
-                r = 0.082/57.6; x = 0.027/57.6
-        
-        # names of primary lines
-        elif graph[e[0]][e[1]]['label']=='P':
-            if prim_amps[e]<=140:
-                edge_name[e] = 'OH_Swanate'
-                r = 0.407/39690; x = 0.113/39690
-            elif prim_amps[e]<=185:
-                edge_name[e] = 'OH_Sparrow'
-                r = 0.259/39690; x = 0.110/39690
-            elif prim_amps[e]<=240:
-                edge_name[e] = 'OH_Raven'
-                r = 0.163/39690; x = 0.104/39690
-            elif prim_amps[e]<=315:
-                edge_name[e] = 'OH_Pegion'
-                r = 0.103/39690; x = 0.0992/39690
-            else:
-                edge_name[e] = 'OH_Penguin'
-                r = 0.0822/39690; x = 0.0964/39690
-        else:
-            edge_name[e] = 'OH_Penguin'
-            r = 1e-10; x = 1e-10
-        
-        # Assign new resitance and reactance
-        graph.edges[e]['r'] = r * graph.edges[e]['geo_length'] * 1e-3
-        graph.edges[e]['x'] = x * graph.edges[e]['geo_length'] * 1e-3
-    
-    # Add new edge attribute
-    nx.set_edge_attributes(graph,edge_name,'type')
-    return
 
 #%% Function for callback
 def mycallback(model, where):

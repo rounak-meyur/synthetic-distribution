@@ -21,7 +21,7 @@ tmppath = scratchpath + "/temp/"
 sys.path.append(libpath)
 from pyExtractDatalib import GetOSMRoads,GetHomes,GetTransformers,GetMappings
 from pyBuildSecNetlib import MapOSM
-from pyBuildSecNetlib import groups
+from pyMiscUtilslib import groups
 from pyBuildSecNetlib import MeasureDistance as dist
 from pyBuildSecNetlib import generate_optimal_topology as generate
 from pyBuildSecNetlib import create_master_graph_OSM

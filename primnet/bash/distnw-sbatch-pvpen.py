@@ -21,8 +21,8 @@ figpath = scratchpath + "/figs/"
 tmppath = scratchpath + "/temp/"
 distpath = tmppath + "osm-prim-network/"
 
-from pyBuildPrimNetlib import powerflow
-from pyPowerNetworklib import GetDistNet,assign_linetype
+from pyMiscUtilslib import powerflow, assign_linetype
+from pyExtractDatalib import GetDistNet
 
 
 #%% User defined functions
