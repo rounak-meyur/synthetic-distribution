@@ -315,22 +315,19 @@ def GetSubstations(path,areas=None,state_fis='51',
     return subs(cord=dict_cord)
 
 
-def GetTransformers(path,fis,homes):
+def GetTransformers(path,fis):
     """
     Gets the network of local transformers in the county/city
     """
     df_tsfr = pd.read_csv(path+fis+'-tsfr-data.csv',
                           header=None,names=['tid','long','lat','load'])
-    tsfr = nt("Transformers",field_names=["cord","load","graph","secnet"])
+    tsfr = nt("Transformers",field_names=["cord","load","graph"])
     dict_cord = dict([(t.tid, (t.long, t.lat)) for t in df_tsfr.itertuples()])
     dict_load = dict([(t.tid, t.load) for t in df_tsfr.itertuples()])
     df_tsfr_edges = pd.read_csv(path+fis+'-tsfr-net.csv',
                                 header=None,names=['source','target'])
     g = nx.from_pandas_edgelist(df_tsfr_edges)
-    secnet = GetSecnet(path,fis,homes)
-    g_sec = {t: nx.subgraph(secnet,list(nx.descendants(secnet,t))+[t]) \
-             for t in dict_cord}
-    return tsfr(cord=dict_cord,load=dict_load,graph=g,secnet=g_sec)
+    return tsfr(cord=dict_cord,load=dict_load,graph=g)
 
 def GetMappings(path,fis):
     """
@@ -387,7 +384,7 @@ def GetVASubstations(path,sub_file='Electric_Substations.shp',
     return subs(cord=cord)
 
 
-def GetSecnet(path,fis,homes):
+def GetSecnet(path,fis,inppath):
     """
     Extracts the generated secondary network information for the area and
     constructs the networkx graph. The attributes are listed below.
@@ -396,6 +393,9 @@ def GetSecnet(path,fis,homes):
         label: node label, H: residence, T: transformer
         resload: average load at residence
     """
+    # Extract home data
+    homes = GetHomes(inppath, fis)
+    
     # Extract the secondary network data from all areas
     nodelabel = {}
     nodepos = {}

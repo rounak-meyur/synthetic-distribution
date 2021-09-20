@@ -22,7 +22,7 @@ sys.path.append(libpath)
 from pyExtractDatalib import GetOSMRoads,GetHomes,GetTransformers,GetMappings
 from pyBuildSecNetlib import MapOSM
 from pyMiscUtilslib import groups
-from pyBuildSecNetlib import MeasureDistance as dist
+from pyGeometrylib import geodist
 from pyBuildSecNetlib import generate_optimal_topology as generate
 from pyBuildSecNetlib import create_master_graph_OSM
 
@@ -98,7 +98,7 @@ for link in links:
     start_tsf = dict_tsfr[tsfrlist[0]][:2]
     road_cord1 = [roads.nodes[link[0]]['x'],roads.nodes[link[0]]['y']]
     road_cord2 = [roads.nodes[link[1]]['x'],roads.nodes[link[1]]['y']]
-    if dist(start_tsf,road_cord1)<dist(start_tsf,road_cord2):
+    if geodist(start_tsf,road_cord1)<geodist(start_tsf,road_cord2):
         start = link[0]; end = link[1]
     else:
         start = link[1]; end = link[0]
@@ -142,7 +142,7 @@ for link in links:
 
 
 #%% Create the transformer and road network
-tsfr = GetTransformers(tmppath+dirname,fiscode,homes)
+tsfr = GetTransformers(tmppath+dirname,fiscode)
 links = GetMappings(tmppath+dirname,fiscode)
 
 target = "osm-master-graph/"

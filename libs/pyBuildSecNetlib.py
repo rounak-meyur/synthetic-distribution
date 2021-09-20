@@ -5,14 +5,13 @@ Created on Mon Sep 30 11:01:21 2019
 @author: rounak
 """
 import sys,os
-from geographiclib.geodesic import Geodesic
-from pyGeometrylib import MeasureDistance
+from pyGeometrylib import geodist, Link
 import networkx as nx
 import numpy as np
 import pandas as pd
 from scipy.spatial import Delaunay
 from itertools import combinations
-from shapely.geometry import LineString,MultiPoint,LinearRing,Point
+from shapely.geometry import LinearRing,Point,LineString
 from pyqtree import Index
 import gurobipy as grb
 import datetime
@@ -211,50 +210,6 @@ class MapOSM:
         return Map2Link
     
 
-#%% Geometry for NAVTEQ links
-class Link(LineString):
-    """
-    Derived class from Shapely LineString to compute metric distance based on 
-    geographical coordinates over geometric coordinates.
-    """
-    def __init__(self,line_geom):
-        """
-        """
-        super().__init__(line_geom)
-        self.geod_length = self.__length()
-        return
-    
-    
-    def __length(self):
-        '''
-        Computes the geographical length in meters between the ends of the link.
-        '''
-        if self.geom_type != 'LineString':
-            print("Cannot compute length!!!")
-            return None
-        # Copute great circle distance
-        geod = Geodesic.WGS84
-        length = 0.0
-        for i in range(len(list(self.coords))-1):
-            lon1,lon2 = self.xy[0][i:i+2]
-            lat1,lat2 = self.xy[1][i:i+2]
-            length += geod.Inverse(lat1, lon1, lat2, lon2)['s12']
-        return length
-    
-    
-    def InterpolatePoints(self,min_sep=50):
-        """
-        """
-        points = []
-        length = self.geod_length
-        sep = max(min_sep,(length/25))
-        for i in np.arange(0,length,sep):
-            x,y = self.interpolate(i/length,normalized=True).xy
-            xy = (x[0],y[0])
-            points.append(xy)
-        if len(points)==0: 
-            points.append(Point((self.xy[0][0],self.xy[1][0])))
-        return {i:[pt.x,pt.y] for i,pt in enumerate(MultiPoint(points))}
 
 
 #%% Mixed Integer Linear Program to create secondary network
@@ -406,7 +361,8 @@ def generate_optimal_topology(linkgeom,homes,minsep=50,penalty=0.5,
     # Generate the forest of trees
     forest = nx.Graph()
     forest.add_edges_from(edgelist)
-    node_cord = {node: roots[node] if node in roots else homes[node]['cord']\
+    node_cord = {node: (roots[node].x,roots[node].y) \
+                 if node in roots else homes[node]['cord']\
                  for node in forest}
     nx.set_node_attributes(forest,node_cord,'cord')
     node_load = {node:sum([homes[h]['load'] \
@@ -434,7 +390,8 @@ def create_dummy_graph(linkgeom,homes,minsep=50,penalty=0.5,heuristic=None):
             of transformers.
     """
     # Interpolate points along link for probable transformer locations
-    transformers = Link(linkgeom).InterpolatePoints(minsep)
+    tsfr_pts = Link(linkgeom).InterpolatePoints(minsep)
+    transformers = {i:pt for i,pt in enumerate(tsfr_pts)}
     
     # Identify which side of road each home is located
     link_cords = list(linkgeom.coords)
@@ -466,10 +423,10 @@ def create_dummy_graph(linkgeom,homes,minsep=50,penalty=0.5,heuristic=None):
     # Add node attributes to the graph
     nx.set_node_attributes(graph,node_pos,'cord')
     nx.set_node_attributes(graph,load,'load')
-    edge_cost = {e:MeasureDistance(node_pos[e[0]],node_pos[e[1]])*\
+    edge_cost = {e:geodist(node_pos[e[0]],node_pos[e[1]])*\
                  (1+penalty*abs(sides[e[0]]-sides[e[1]])) \
                   for e in list(graph.edges())}
-    edge_length = {e:MeasureDistance(node_pos[e[0]],node_pos[e[1]])\
+    edge_length = {e:geodist(node_pos[e[0]],node_pos[e[1]])\
                   for e in list(graph.edges())}
     nx.set_edge_attributes(graph,edge_length,'length')
     nx.set_edge_attributes(graph,edge_cost,'cost')
@@ -525,7 +482,7 @@ def get_nearpts_tsfr(transformers,homes,heuristic):
     edgelist = []
     homelist = [h for h in homes]
     for t in transformers:
-        distlist = [MeasureDistance(transformers[t],homes[h]) for h in homes]
+        distlist = [geodist(transformers[t],homes[h]) for h in homes]
         imphomes = np.array(homelist)[np.argsort(distlist)[:heuristic]]
         edgelist.extend([(t,n) for n in imphomes])
     return edgelist
@@ -537,7 +494,7 @@ def checkpf(forest,roots,r=0.81508/57.6):
                             edgelist=list(forest.edges()),oriented=True).toarray()
     node_pos = nx.get_node_attributes(forest,'cord')
     node_load = nx.get_node_attributes(forest,'load')
-    R = [1.0/(MeasureDistance(node_pos[e[0]],node_pos[e[1]])*0.001*r) \
+    R = [1.0/(geodist(node_pos[e[0]],node_pos[e[1]])*0.001*r) \
          for e in list(forest.edges())]
     D = np.diag(R)
     home_ind = [i for i,node in enumerate(forest.nodes()) \
@@ -574,30 +531,22 @@ def create_master_graph(roads,tsfr,links):
     edgelist = road_edges + tsfr_edges
     graph = nx.Graph()
     graph.add_edges_from(edgelist)
-    nodelist = list(graph.nodes())
     
-    # Coordinates of nodes in network
-    nodepos = {n:roads.cord[n] if n in roads.cord else tsfr.cord[n] for n in nodelist}
-    nx.set_node_attributes(graph,nodepos,name='cord')
+    # Node attributes in network
+    for n in graph.nodes:
+        if n in roads:
+            graph.nodes[n]['cord'] = (roads.nodes[n]['x'],roads.nodes[n]['y'])
+            graph.nodes[n]['label'] = 'R'
+            graph.nodes[n]['load'] = 0.0
+        else:
+            graph.nodes[n]['cord'] = tsfr.cord[n]
+            graph.nodes[n]['label'] = 'T'
+            graph.nodes[n]['load'] = tsfr.load[n]
     
     # Length of edges
-    edge_length = {e:MeasureDistance(nodepos[e[0]],nodepos[e[1]]) \
-                    for e in edgelist}
-    nx.set_edge_attributes(graph,edge_length,name='length')
-    
-    # Label the nodes in network
-    node_label = {n:'T' if n in tsfr.cord else 'R' for n in list(graph.nodes())}
-    nx.set_node_attributes(graph,node_label,'label')
-    
-    # Add load at local transformer nodes
-    node_load = {n:tsfr.load[n] if node_label[n]=='T' else 0.0 \
-                 for n in list(graph.nodes())}
-    nx.set_node_attributes(graph,node_load,'load')
-    
-    # Add the associated secondary network for each local transformer
-    sec_net = {n:tsfr.secnet[n] if node_label[n]=='T' else nx.Graph() \
-                 for n in list(graph.nodes())}
-    nx.set_node_attributes(graph,sec_net,'secnet')
+    for e in graph.edges:
+        edge_geom = LineString((graph.nodes[e[0]]['cord'],graph.nodes[e[1]]['cord']))
+        graph.edges[e]['length'] = Link(edge_geom).geod_length
     return graph
 
 def create_master_graph_OSM(roads,tsfr,links):
@@ -624,29 +573,20 @@ def create_master_graph_OSM(roads,tsfr,links):
     edgelist = [(e[0],e[1]) for e in road_edges] + tsfr_edges
     graph = nx.Graph()
     graph.add_edges_from(edgelist)
-    nodelist = list(graph.nodes())
     
-    # Coordinates of nodes in network
-    nodepos = {n:(roads.nodes[n]['x'],roads.nodes[n]['y']) \
-               if n in roads else tsfr.cord[n] for n in nodelist}
-    nx.set_node_attributes(graph,nodepos,name='cord')
+    # Node attributes in network
+    for n in graph.nodes:
+        if n in roads:
+            graph.nodes[n]['cord'] = (roads.nodes[n]['x'],roads.nodes[n]['y'])
+            graph.nodes[n]['label'] = 'R'
+            graph.nodes[n]['load'] = 0.0
+        else:
+            graph.nodes[n]['cord'] = tsfr.cord[n]
+            graph.nodes[n]['label'] = 'T'
+            graph.nodes[n]['load'] = tsfr.load[n]
     
     # Length of edges
-    edge_length = {e:MeasureDistance(nodepos[e[0]],nodepos[e[1]]) \
-                    for e in edgelist}
-    nx.set_edge_attributes(graph,edge_length,name='length')
-    
-    # Label the nodes in network
-    node_label = {n:'T' if n in tsfr.cord else 'R' for n in nodelist}
-    nx.set_node_attributes(graph,node_label,'label')
-    
-    # Add load at local transformer nodes
-    node_load = {n:tsfr.load[n] if node_label[n]=='T' else 0.0 \
-                 for n in nodelist}
-    nx.set_node_attributes(graph,node_load,'load')
-    
-    # Add the associated secondary network for each local transformer
-    sec_net = {n:tsfr.secnet[n] if node_label[n]=='T' else nx.Graph() \
-                 for n in list(graph.nodes())}
-    nx.set_node_attributes(graph,sec_net,'secnet')
+    for e in graph.edges:
+        edge_geom = LineString((graph.nodes[e[0]]['cord'],graph.nodes[e[1]]['cord']))
+        graph.edges[e]['length'] = Link(edge_geom).geod_length
     return graph

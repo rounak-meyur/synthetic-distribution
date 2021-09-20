@@ -40,6 +40,24 @@ def read_master_graph(path,sub):
     print("Master graph read from stored gpickle file")
     return graph
 
+def get_subgraph(graph,subdata):
+    near = subdata.nearest
+    nodelist = subdata.nodes
+    
+    # Get and set attributes
+    nodelabel = nx.get_node_attributes(graph,'label')
+    
+    # Get the distance from the nearest substation
+    hvpath = {r:nx.shortest_path(graph,source=near,target=r,weight='length') \
+              if nodelabel[r]=='R' else [] for r in nodelist}
+    hvdist = {r:sum([graph[hvpath[r][i]][hvpath[r][i+1]]['length']\
+                     for i in range(len(hvpath[r])-1)]) for r in nodelist}
+    
+    sgraph = graph.subgraph(subdata.nodes)
+    nx.set_node_attributes(sgraph,hvpath,'feedpath')
+    nx.set_node_attributes(sgraph,hvdist,'distance')
+    return sgraph
+
 def get_secnet(path,graph):
     tnodes = [n for n in graph if graph.nodes[n]['label']=='T']
     fislist = list(set([str(x)[2:5] for x in tnodes]))

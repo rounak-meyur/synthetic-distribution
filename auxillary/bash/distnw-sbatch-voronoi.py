@@ -50,29 +50,11 @@ substation = nt("local_substation",field_names=["id","cord","nodes","nearest"])
 
 
 #%% Initialize Primary Network Generation Process
-def get_subgraph(graph,subdata):
-    near = subdata.nearest
-    nodelist = subdata.nodes
-    
-    # Get and set attributes
-    nodelabel = nx.get_node_attributes(graph,'label')
-    
-    # Get the distance from the nearest substation
-    hvpath = {r:nx.shortest_path(graph,source=near,target=r,weight='length') \
-              if nodelabel[r]=='R' else [] for r in nodelist}
-    hvdist = {r:sum([graph[hvpath[r][i]][hvpath[r][i+1]]['length']\
-                     for i in range(len(hvpath[r])-1)]) for r in nodelist}
-    
-    sgraph = graph.subgraph(subdata.nodes)
-    nx.set_node_attributes(sgraph,hvpath,'feedpath')
-    nx.set_node_attributes(sgraph,hvdist,'distance')
-    return sgraph
-
 
 for sub in S2Node:
     sub_data = substation(id=sub,cord=subs.cord[sub],
                           nodes=S2Node[sub],nearest=S2Near[sub])
-    sub_graph = get_subgraph(G,sub_data)
+    sub_graph = G.subgraph(sub_data.nodes)
     nx.write_gpickle(sub_graph,tmpPath+'osm-prim-master/'+str(sub)+'-master.gpickle')
     
 
