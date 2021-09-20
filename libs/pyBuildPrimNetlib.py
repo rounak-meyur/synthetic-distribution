@@ -9,7 +9,9 @@ from shapely.geometry import LineString
 import networkx as nx
 import gurobipy as grb
 import numpy as np
+import pandas as pd
 from pyGeometrylib import Link
+from pyExtractDatalib import GetPrimRoad
 
 
 #%% Functions
@@ -34,9 +36,22 @@ def read_master_graph(path,sub):
             load: load at the transformer nodes
             length: geodesic length of the edges
     """
-    graph = nx.read_gpickle(path+sub+'-master.gpickle')
+    graph = GetPrimRoad(path,sub)
     print("Master graph read from stored gpickle file")
     return graph
+
+def get_secnet(path,graph):
+    tnodes = [n for n in graph if graph.nodes[n]['label']=='T']
+    fislist = list(set([str(x)[2:5] for x in tnodes]))
+    
+    # Get the secondary network associated with each transformer
+    secnet = nx.Graph()
+    for fis in fislist:
+        df_tsfr_edges = pd.read_csv(path+fis+'-tsfr-net.csv',
+                                    header=None,names=['source','target'])
+        g = nx.from_pandas_edgelist(df_tsfr_edges)
+        secnet = nx.compose(secnet,g)
+    return
 
 #%% Function for callback
 def mycallback(model, where):

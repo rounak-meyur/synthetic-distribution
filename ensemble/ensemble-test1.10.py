@@ -30,7 +30,6 @@ from pyExtractDatalib import GetDistNet,GetPrimRoad
 from pyMiscUtilslib import get_load, create_variant_network, reduced_MILP_primary
 
 
-
 #%% Load the network data
 sub = 121143
 synth_net = GetDistNet(distpath,sub)
