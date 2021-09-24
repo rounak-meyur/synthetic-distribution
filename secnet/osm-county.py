@@ -10,20 +10,24 @@ Virginia. Explore the dataset and other stuff related to it.
 
 import sys,os
 import geopandas as gpd
+import networkx as nx
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
 inppath = rootpath + "/input/"
-# sys.exit(0)
+outpath = workpath + "/out/"
+
 sys.path.append(libpath)
 from pyExtractDatalib import GetOSMRoads,GetHomes
 
+
+#%% Test road data extraction
 fiscode = '161'
 roads = GetOSMRoads(inppath,fis=fiscode)
 roads1 = GetOSMRoads(inppath,fis='121')
-sys.exit(0)
+
 homes = GetHomes(inppath,fis=fiscode)
 
 #%% Check by plotting data
