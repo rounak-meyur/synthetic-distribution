@@ -12,32 +12,14 @@ System inputs: fiscode of county
 
 import sys,os
 import networkx as nx
-from collections import namedtuple as nt
 import time
-
-def remove_cycle(graph):
-    try:
-        cycle = nx.find_cycle(graph)
-        print("Cycles found:",cycle)
-        nodes = list(set([c[0] for c in cycle] + [c[1] for c in cycle]))
-        nodes = [n for n in nodes if graph.nodes[n]['label']=='R']
-        print("Number of nodes:",graph.number_of_nodes())
-        print("Removing cycles...")
-        for n in nodes:
-            graph.remove_node(n)
-        print("After removal...Number of nodes:",graph.number_of_nodes())
-        print("Number of comps.",nx.number_connected_components(graph))
-        remove_cycle(graph)
-    except:
-        print("No cycles found!!!")
-        return
 
 
 
 workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
-from pyExtractDatalib import GetSubstations
+
 from pyBuildPrimNetlib import Primary
 from pyMiscUtilslib import powerflow,assign_linetype
 
@@ -52,33 +34,36 @@ dirname = 'osm-prim-master/'
 
 
 # Extract all substations in the region
-subs = GetSubstations(inpPath)
+with open(tmpPath+"subdata.txt") as f:
+    lines = f.readlines()
+
+data = [temp.strip('\n').split('\t') for temp in lines]
+subs = {int(d[0]):{"id":int(d[0]),"near":int(d[1]),
+                   "cord":[float(d[2]),float(d[3])]} for d in data}
 
 
 sub=int(sys.argv[1])
-substation = nt("local_substation",field_names=["id","cord"])
-sub_data = substation(id=sub,cord=subs.cord[sub])
+sub_data = subs[sub]
 
 # Generate primary distribution network by partitions
 start_time = time.time()
 P = Primary(sub_data,tmpPath+dirname)
 
 
-prim_net = P.get_sub_network(grbpath=tmpPath)
+dist_net = P.get_sub_network(tmpPath+'osm-sec-network/',inpPath,tmpPath)
 end_time = time.time()
 time_taken = end_time - start_time
 
-remove_cycle(prim_net)
 
 # Run power flow and store the flows and voltages
-powerflow(prim_net)
+powerflow(dist_net)
     
 # Assign line types
-assign_linetype(prim_net)
+assign_linetype(dist_net)
 
 with open(tmpPath+'osm-prim-time.txt','a') as f:
     f.write(sys.argv[1]+'\t'+str(time_taken)+'\n')
 
 
 
-nx.write_gpickle(prim_net,tmpPath+'osm-prim-network/'+str(sub)+'-prim-dist.gpickle')
+nx.write_gpickle(dist_net,tmpPath+'osm-prim-network/'+str(sub)+'-dist-net.gpickle')

@@ -12,7 +12,6 @@ System inputs: fiscode of county
 
 import sys,os
 import networkx as nx
-from collections import namedtuple as nt
 
 
 
@@ -46,15 +45,19 @@ for a in areas:
 
 # Create the partition
 S2Near,S2Node = vorpart(subs,G)
-substation = nt("local_substation",field_names=["id","cord","nodes","nearest"])
 
 
 #%% Initialize Primary Network Generation Process
 
 for sub in S2Node:
-    sub_data = substation(id=sub,cord=subs.cord[sub],
-                          nodes=S2Node[sub],nearest=S2Near[sub])
-    sub_graph = G.subgraph(sub_data.nodes)
+    sub_graph = G.subgraph(S2Node[sub])
     nx.write_gpickle(sub_graph,tmpPath+'osm-prim-master/'+str(sub)+'-master.gpickle')
+    
+    # Save the substation data
+    data = '\t'.join([str(x) for x in [sub,S2Near[sub],subs.cord[sub][0],
+                                       subs.cord[sub][1]]]) + '\n'
+    with open(tmpPath + "subdata.txt",'a') as f:
+        f.write(data)
+    
     
 

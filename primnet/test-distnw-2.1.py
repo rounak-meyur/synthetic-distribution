@@ -14,13 +14,40 @@ rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 inppath = rootpath + "/input/"
 figpath = workpath + "/figs/"
-distpath = workpath + "/out/"
+outpath = workpath + "/out/"
+secpath = rootpath + "/secnet/out/osm-sec-network/"
 
 
 sys.path.append(libpath)
+from pyBuildPrimNetlib import Primary
 from pyDrawNetworklib import plot_network, color_nodes, color_edges
+from pyMiscUtilslib import powerflow
 print("Imported modules")
 
+#%% Primary network generation
+
+# Extract all substations in the region
+with open(outpath+"subdata.txt") as f:
+    lines = f.readlines()
+
+data = [temp.strip('\n').split('\t') for temp in lines]
+subs = {int(d[0]):{"id":int(d[0]),"near":int(d[1]),
+                   "cord":[float(d[2]),float(d[3])]} for d in data}
+
+
+sub=121144
+sub_data = subs[sub]
+
+# Generate primary distribution network by partitions
+P = Primary(sub_data,outpath+"osm-prim-master/")
+
+dist_net = P.get_sub_network(secpath,inppath,outpath)
+
+powerflow(dist_net)
+sys.exit(0)
+
+
+#%% Other stuff
 def GetDistNet(path,code):
     """
     Read the txt file containing the edgelist of the generated synthetic network and
@@ -58,9 +85,9 @@ sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 14872
 
 
 #%% Combine primary and secondary network
-synth_net = GetDistNet(distpath,sublist)
-small_synth_net1 = GetDistNet(distpath,[121143])
-small_synth_net2 = GetDistNet(distpath,[147793])
+synth_net = GetDistNet(outpath,sublist)
+small_synth_net1 = GetDistNet(outpath,[121143])
+small_synth_net2 = GetDistNet(outpath,[147793])
 
 dict_inset = {121143:{'graph':small_synth_net1,'loc':2,
                       'loc1':1,'loc2':3,'zoom':1.5},
@@ -68,6 +95,7 @@ dict_inset = {121143:{'graph':small_synth_net1,'loc':2,
                       'loc1':1,'loc2':4,'zoom':1.2}}
 
 ##%% Plot the network with inset figure
+plot_network(dist_net,with_secnet=True)
 plot_network(synth_net,dict_inset,figpath,with_secnet=True)
 
 #%% Voltage and flow plots

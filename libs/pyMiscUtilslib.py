@@ -14,6 +14,7 @@ import numpy as np
 from math import log,exp
 from pyGeometrylib import Link
 import gurobipy as grb
+from pyExtractDatalib import GetSecnet,GetHomes
 
 
 #%% Functions on data structures
@@ -58,6 +59,47 @@ def get_load(graph):
     tsfr2res = groups(res2tsfr)
     LOAD = {t:sum([graph.nodes[n]['load'] for n in tsfr2res[t]]) for t in tnodes}
     return LOAD
+
+def get_secnet(graph,secpath,homepath):
+    tnodes = [n for n in graph if graph.nodes[n]['label']=='T']
+    fislist = list(set([str(x)[2:5] for x in tnodes]))
+    
+    # Get all secondary networks
+    secnet = nx.Graph()
+    hcord = {}; hload = {}
+    for fis in fislist:
+        g = GetSecnet(secpath, fis)
+        secnet = nx.compose(secnet,g)
+        h = GetHomes(homepath,fis)
+        hcord.update(h.cord); hload.update(h.average)
+    
+    # Extract only associated secondaries
+    sec_graph = nx.Graph()
+    comps = list(nx.connected_components(secnet))
+    for t in tnodes:
+        comp = [c for c in comps if t in c][0]
+        g = secnet.subgraph(comp)
+        sec_graph = nx.compose(sec_graph,g)
+    
+    # Add the secondary network to the primary network
+    graph = nx.compose(graph,sec_graph)
+    
+    # Add new node attributes
+    hnodes = [n for n in sec_graph if n not in tnodes]
+    for n in hnodes:
+        graph.nodes[n]['cord'] = hcord[n]
+        graph.nodes[n]['load'] = hload[n]
+        graph.nodes[n]['label'] = 'H'
+    
+    for e in graph.edges:
+        if e in sec_graph.edges:
+            graph.edges[e]['geometry'] = LineString((graph.nodes[e[0]]["cord"],
+                                                     graph.nodes[e[1]]["cord"]))
+            graph.edges[e]['length'] = Link(graph.edges[e]['geometry']).geod_length
+            graph.edges[e]['label'] = 'S'
+            graph.edges[e]['r'] = 0.81508/57.6 * graph.edges[e]['length']
+            graph.edges[e]['x'] = 0.34960/57.6 * graph.edges[e]['length']
+    return graph
 
 def powerflow(graph):
     """
@@ -147,8 +189,8 @@ def assign_linetype(graph):
             r = 1e-10; x = 1e-10
         
         # Assign new resitance and reactance
-        graph.edges[e]['r'] = r * graph.edges[e]['geo_length'] * 1e-3
-        graph.edges[e]['x'] = x * graph.edges[e]['geo_length'] * 1e-3
+        graph.edges[e]['r'] = r * graph.edges[e]['length'] * 1e-3
+        graph.edges[e]['x'] = x * graph.edges[e]['length'] * 1e-3
     
     # Add new edge attribute
     nx.set_edge_attributes(graph,edge_name,'type')

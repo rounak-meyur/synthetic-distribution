@@ -9,67 +9,38 @@ from shapely.geometry import LineString
 import networkx as nx
 import gurobipy as grb
 import numpy as np
-import pandas as pd
 from pyGeometrylib import Link
 from pyExtractDatalib import GetPrimRoad
+from pyMiscUtilslib import get_secnet
 
 
 #%% Functions
-def read_master_graph(path,sub):
-    """
-    Reads the master graph from the binary/gpickle file.
-
-    Parameters
-    ----------
-    path : string
-        directory path for the master graph gpickle file.
-    sub : string
-        ID for the substation under consideration.
-
-    Returns
-    -------
-    graph : networkx graph
-        The master graph of road network edges with transformer nodes. The data
-        associated with the nodes and edges are listed below:
-            cord: node geographical coordinates
-            distance: geodesic distance of nodes from the substation
-            load: load at the transformer nodes
-            length: geodesic length of the edges
-    """
-    graph = GetPrimRoad(path,sub)
-    print("Master graph read from stored gpickle file")
-    return graph
-
-def get_subgraph(graph,subdata):
-    near = subdata.nearest
-    nodelist = subdata.nodes
-    
-    # Get and set attributes
-    nodelabel = nx.get_node_attributes(graph,'label')
-    
+def update_data(graph,subdata):
     # Get the distance from the nearest substation
-    hvpath = {r:nx.shortest_path(graph,source=near,target=r,weight='length') \
-              if nodelabel[r]=='R' else [] for r in nodelist}
+    hvpath = {r:nx.shortest_path(graph,source=subdata['near'],
+                                 target=r,weight='length') \
+              if graph.nodes[r]['label']=='R' else [] for r in graph}
     hvdist = {r:sum([graph[hvpath[r][i]][hvpath[r][i+1]]['length']\
-                     for i in range(len(hvpath[r])-1)]) for r in nodelist}
-    
-    sgraph = graph.subgraph(subdata.nodes)
-    nx.set_node_attributes(sgraph,hvpath,'feedpath')
-    nx.set_node_attributes(sgraph,hvdist,'distance')
-    return sgraph
+                     for i in range(len(hvpath[r])-1)]) for r in graph}
+    nx.set_node_attributes(graph,hvdist,'distance')
+    return hvpath
 
-def get_secnet(path,graph):
-    tnodes = [n for n in graph if graph.nodes[n]['label']=='T']
-    fislist = list(set([str(x)[2:5] for x in tnodes]))
-    
-    # Get the secondary network associated with each transformer
-    secnet = nx.Graph()
-    for fis in fislist:
-        df_tsfr_edges = pd.read_csv(path+fis+'-tsfr-net.csv',
-                                    header=None,names=['source','target'])
-        g = nx.from_pandas_edgelist(df_tsfr_edges)
-        secnet = nx.compose(secnet,g)
-    return
+def remove_cycle(graph):
+    try:
+        cycle = nx.find_cycle(graph)
+        print("Cycles found:",cycle)
+        nodes = list(set([c[0] for c in cycle] + [c[1] for c in cycle]))
+        nodes = [n for n in nodes if graph.nodes[n]['label']=='R']
+        print("Number of nodes:",graph.number_of_nodes())
+        print("Removing cycles...")
+        for n in nodes:
+            graph.remove_node(n)
+        print("After removal...Number of nodes:",graph.number_of_nodes())
+        print("Number of comps.",nx.number_connected_components(graph))
+        remove_cycle(graph)
+    except:
+        print("No cycles found!!!")
+        return
 
 #%% Function for callback
 def mycallback(model, where):
@@ -310,9 +281,14 @@ class Primary:
         """
         self.subdata = subdata
         self.graph = nx.Graph()
-        master = read_master_graph(path,str(subdata.id))
+        
+        # Update master graph with substation distance data
+        master = GetPrimRoad(path,str(subdata["id"]))
+        self.hvpath = update_data(master,subdata)
+        print("Road distance updated")
+        
+        # Partition the master graph based on load
         M = sum(nx.get_node_attributes(master,'load').values())/1e3
-        self.secnet = nx.get_node_attributes(master,'secnet')
         self.max_mva = max([feedcap,M/div])
         self.get_partitions(master)
         print("Master graph partitioned")
@@ -339,7 +315,7 @@ class Primary:
                 self.get_partitions(sglist)
         return
         
-    def get_sub_network(self,grbpath=None):
+    def get_sub_network(self,secpath=None,inppath=None,grbpath=None):
         """
         """
         # Optimizaton problem to get the primary network
@@ -353,79 +329,63 @@ class Primary:
             tnodes += M.tnodes
         
         # Add the first edge between substation and nearest road node
-        hvlines = [(self.subdata.id,r) for r in roots]
+        hvlines = [(self.subdata["id"],r) for r in roots]
         
         # Create the network with data as attributes
-        dist_net = self.create_network(primary,hvlines)
-        return dist_net
+        net = self.create_network(primary,hvlines)
+        
+        # Update secondary network
+        net = get_secnet(net,secpath,inppath)
+        return net
     
     
     def create_network(self,primary,hvlines):
         """
-        Create a network with the primary network and part of the associated secondary
-        network. The roots of the primary network are connected to the substation 
-        through high voltage lines.
+        Create a network with the primary network. The roots of the primary 
+        network are connected to the substation through high voltage lines.
         Input: 
             primary: list of edges forming the primary network
             hvlines: list of edges joining the roots of the primary network with the
             substation(s).
         """
-        # Get the secondary network associated with transformers in partition
-        sec_net = nx.Graph()
-        for t in self.secnet:
-            sec_net = nx.compose(sec_net,self.secnet[t])
-        secondary = list(sec_net.edges())
-        
-        secpos = nx.get_node_attributes(sec_net,'cord')
-        seclabel = nx.get_node_attributes(sec_net,'label')
-        secload = nx.get_node_attributes(sec_net,'resload')
         
         # Combine both networks and update labels
-        dist_net = nx.Graph()
-        dist_net.add_edges_from(hvlines+primary+secondary)
+        prim_net = nx.Graph()
+        prim_net.add_edges_from(hvlines+primary)
         
-        # Add coordinate attributes to the nodes of the network.
-        nodepos = nx.get_node_attributes(self.graph,'cord')
-        nodepos[self.subdata.id] = self.subdata.cord
-        nodepos.update(secpos)
-        nx.set_node_attributes(dist_net,nodepos,'cord')
+        # Add node attributes to the primary network
+        for n in prim_net:
+            if n == self.subdata["id"]:
+                prim_net.nodes[n]["cord"] = self.subdata["cord"]
+                prim_net.nodes[n]["label"] = "S"
+                prim_net.nodes[n]["load"] = 0.0
+            else:
+                prim_net.nodes[n]["cord"] = self.graph.nodes[n]["cord"]
+                prim_net.nodes[n]["label"] = self.graph.nodes[n]["label"]
+                prim_net.nodes[n]["load"] = 0.0
         
-        # Label nodes of the created network
-        node_label = nx.get_node_attributes(self.graph,'label')
-        node_label[self.subdata.id] = 'S'
-        node_label.update(seclabel)
-        nx.set_node_attributes(dist_net, node_label, 'label')
-        
-        # Load at nodes
-        nodeload = {n:secload[n] if n in secload else 0.0 \
-                    for n in dist_net.nodes()}
-        nx.set_node_attributes(dist_net,nodeload,'load')
+        # Remove cycles in the network formed of road network nodes
+        remove_cycle(prim_net)
         
         # Label edges of the created network
-        feed_path = nx.get_node_attributes(self.graph,'feedpath')
-        for e in list(dist_net.edges()):
-            if e in primary or (e[1],e[0]) in primary:
-                dist_net.edges[e]['geometry'] = LineString((nodepos[e[0]],nodepos[e[1]]))
-                dist_net.edges[e]['geo_length'] = Link(dist_net.edges[e]['geometry']).geod_length
-                dist_net.edges[e]['label'] = 'P'
-                dist_net.edges[e]['r'] = 0.8625/39690 * dist_net.edges[e]['geo_length']
-                dist_net.edges[e]['x'] = 0.4154/39690 * dist_net.edges[e]['geo_length']
-            elif e in hvlines or (e[1],e[0]) in hvlines:
-                rnode = e[0] if e[1]==self.subdata.id else e[1]
-                path_cords = [self.subdata.cord]+\
-                                   [nodepos[nd] for nd in feed_path[rnode]]
-                dist_net.edges[e]['geometry'] = LineString(path_cords)
-                dist_net.edges[e]['geo_length'] = Link(dist_net.edges[e]['geometry']).geod_length
-                dist_net.edges[e]['label'] = 'E'
-                dist_net.edges[e]['r'] = 1e-12 * dist_net.edges[e]['geo_length']
-                dist_net.edges[e]['x'] = 1e-12 * dist_net.edges[e]['geo_length']
+        for e in prim_net.edges:
+            if self.subdata["id"] in e:
+                rnode = e[0] if e[1]==self.subdata["id"] else e[1]
+                path_cords = [self.subdata["cord"]]+\
+                                   [self.graph.nodes[n]["cord"] for n in self.hvpath[rnode]]
+                prim_net.edges[e]['geometry'] = LineString(path_cords)
+                prim_net.edges[e]['length'] = Link(prim_net.edges[e]['geometry']).geod_length
+                prim_net.edges[e]['label'] = 'E'
+                prim_net.edges[e]['r'] = 1e-12 * prim_net.edges[e]['length']
+                prim_net.edges[e]['x'] = 1e-12 * prim_net.edges[e]['length']
             else:
-                dist_net.edges[e]['geometry'] = LineString((nodepos[e[0]],nodepos[e[1]]))
-                dist_net.edges[e]['geo_length'] = Link(dist_net.edges[e]['geometry']).geod_length
-                dist_net.edges[e]['label'] = 'S'
-                dist_net.edges[e]['r'] = 0.81508/57.6 * dist_net.edges[e]['geo_length']
-                dist_net.edges[e]['x'] = 0.34960/57.6 * dist_net.edges[e]['geo_length']
-        return dist_net
+                prim_net.edges[e]['geometry'] = LineString((prim_net.nodes[e[0]]["cord"],
+                                                            prim_net.nodes[e[1]]["cord"]))
+                prim_net.edges[e]['length'] = max(Link(prim_net.edges[e]['geometry']).geod_length,1e-12)
+                prim_net.edges[e]['label'] = 'P'
+                prim_net.edges[e]['r'] = 0.8625/39690 * prim_net.edges[e]['length']
+                prim_net.edges[e]['x'] = 0.4154/39690 * prim_net.edges[e]['length']
+        return prim_net
     
 
 

@@ -384,7 +384,7 @@ def GetVASubstations(path,sub_file='Electric_Substations.shp',
     return subs(cord=cord)
 
 
-def GetSecnet(path,fis,inppath):
+def GetSecnet(path,fis):
     """
     Extracts the generated secondary network information for the area and
     constructs the networkx graph. The attributes are listed below.
@@ -393,9 +393,6 @@ def GetSecnet(path,fis,inppath):
         label: node label, H: residence, T: transformer
         resload: average load at residence
     """
-    # Extract home data
-    homes = GetHomes(inppath, fis)
-    
     # Extract the secondary network data from all areas
     nodelabel = {}
     nodepos = {}
@@ -408,18 +405,15 @@ def GetSecnet(path,fis,inppath):
         n1 = int(data[0]); n2 = int(data[4])
         edgelist.append((n1,n2))
         # nodedata
-        nodepos[n1]=(float(data[2]),float(data[3]))
-        nodepos[n2]=(float(data[6]),float(data[7]))
+        nodepos[n1]=[float(data[2]),float(data[3])]
+        nodepos[n2]=[float(data[6]),float(data[7])]
         nodelabel[n1] = data[1] 
         nodelabel[n2] = data[5]
     # Construct the graph
-    dict_load = {n:homes.average[n] if nodelabel[n]=='H' else 0.0 \
-                 for n in nodepos}
     secnet = nx.Graph()
     secnet.add_edges_from(edgelist)
     nx.set_node_attributes(secnet,nodepos,'cord')
     nx.set_node_attributes(secnet,nodelabel,'label')
-    nx.set_node_attributes(secnet,dict_load,'resload')
     return secnet
 
 #%% Get road and transformer network (output of Step 1)
@@ -439,7 +433,7 @@ def GetPrimRoad(path,code):
         edge attributes of graph:
             None
     """
-    graph = nx.read_gpickle(path+str(code)+'-road.gpickle')
+    graph = nx.read_gpickle(path+str(code)+'-master.gpickle')
     return graph
 
 #%% Get output synthetic networks (output of Step 2)
