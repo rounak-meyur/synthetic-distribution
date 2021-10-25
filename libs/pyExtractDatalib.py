@@ -433,7 +433,13 @@ def GetPrimRoad(path,code):
         edge attributes of graph:
             None
     """
-    graph = nx.read_gpickle(path+str(code)+'-master.gpickle')
+    if type(code) == list:
+        graph = nx.Graph()
+        for c in code:
+            g = nx.read_gpickle(path+str(c)+'-master.gpickle')
+            graph = nx.compose(graph,g)
+    else:
+        graph = nx.read_gpickle(path+str(code)+'-master.gpickle')
     return graph
 
 #%% Get output synthetic networks (output of Step 2)
@@ -465,10 +471,10 @@ def GetDistNet(path,code):
     if type(code) == list:
         graph = nx.Graph()
         for c in code:
-            g = nx.read_gpickle(path+str(c)+'-prim-dist.gpickle')
+            g = nx.read_gpickle(path+str(c)+'-dist-net.gpickle')
             graph = nx.compose(graph,g)
     else:
-        graph = nx.read_gpickle(path+str(code)+'-prim-dist.gpickle')
+        graph = nx.read_gpickle(path+str(code)+'-dist-net.gpickle')
     return graph
 
 #%% Actual Network and Synthetic Network data

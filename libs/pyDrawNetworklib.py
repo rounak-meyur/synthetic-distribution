@@ -7,7 +7,7 @@ Description: Functions to create network representations and color graphs based
 on their attributes.
 """
 
-from shapely.geometry import Point
+from shapely.geometry import Point,LineString
 import numpy as np
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -23,9 +23,12 @@ def DrawNodes(synth_graph,ax,label=['S','T','H'],color='green',size=25):
     Get the node geometries in the network graph for the specified node label.
     """
     # Get the nodes for the specified label
-    nodelist = [n for n in synth_graph.nodes() \
-                if synth_graph.nodes[n]['label']==label \
-                    or synth_graph.nodes[n]['label'] in label]
+    if label == []:
+        nodelist = list(synth_graph.nodes())
+    else:
+        nodelist = [n for n in synth_graph.nodes() \
+                    if synth_graph.nodes[n]['label']==label \
+                        or synth_graph.nodes[n]['label'] in label]
     # Get the dataframe for node and edge geometries
     d = {'nodes':nodelist,
          'geometry':[Point(synth_graph.nodes[n]['cord']) for n in nodelist]}
@@ -33,17 +36,20 @@ def DrawNodes(synth_graph,ax,label=['S','T','H'],color='green',size=25):
     df_nodes.plot(ax=ax,color=color,markersize=size)
     return
 
-def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0):
+def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0,style='solid'):
     """
     """
     # Get the nodes for the specified label
-    edgelist = [e for e in synth_graph.edges() \
-                if synth_graph[e[0]][e[1]]['label']==label\
-                    or synth_graph[e[0]][e[1]]['label'] in label]
+    if label == []:
+        edgelist = list(synth_graph.edges())
+    else:
+        edgelist = [e for e in synth_graph.edges() \
+                    if synth_graph[e[0]][e[1]]['label']==label\
+                        or synth_graph[e[0]][e[1]]['label'] in label]
     d = {'edges':edgelist,
-         'geometry':[synth_graph[e[0]][e[1]]['geometry'] for e in edgelist]}
+         'geometry':[synth_graph.edges[e]['geometry'] for e in edgelist]}
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_edges.plot(ax=ax,edgecolor=color,linewidth=width)
+    df_edges.plot(ax=ax,edgecolor=color,linewidth=width,linestyle=style)
     return
 
 def plot_gdf(ax,df_edges,df_nodes,color):
@@ -55,7 +61,7 @@ def plot_gdf(ax,df_edges,df_nodes,color):
 def plot_network(net,inset={},path=None,with_secnet=False):
     """
     """
-    fig = plt.figure(figsize=(30,30), dpi=72)
+    fig = plt.figure(figsize=(40,40), dpi=72)
     ax = fig.add_subplot(111)
     # Draw nodes
     DrawNodes(net,ax,label='S',color='dodgerblue',size=2000)
@@ -92,20 +98,79 @@ def plot_network(net,inset={},path=None,with_secnet=False):
     # Legend for the plot
     leghands = [Line2D([0], [0], color='black', markerfacecolor='black', 
                    marker='o',markersize=0,label='primary network'),
-            Line2D([0], [0], color='crimson', markerfacecolor='crimson', 
-                   marker='o',markersize=0,label='secondary network'),
             Line2D([0], [0], color='dodgerblue', 
                    markerfacecolor='dodgerblue', marker='o',
                    markersize=0,label='high voltage feeder'),
             Line2D([0], [0], color='white', markerfacecolor='green', 
                    marker='o',markersize=20,label='transformer'),
-            Line2D([0], [0], color='white', markerfacecolor='red', 
-                   marker='o',markersize=20,label='residence'),
+            Line2D([0], [0], color='white', markerfacecolor='dodgerblue', 
+                   marker='o',markersize=20,label='substation')]
+    if with_secnet:
+        leghands.insert(1,Line2D([0], [0], color='crimson', markerfacecolor='crimson', 
+               marker='o',markersize=0,label='secondary network'))
+        leghands.insert(-1,Line2D([0], [0], color='white', markerfacecolor='red', 
+               marker='o',markersize=20,label='residence'))
+    ax.legend(handles=leghands,loc='best',ncol=1,prop={'size': 25})
+    if path != None: 
+        fig.savefig("{}{}.png".format(path,'-51121-dist'),bbox_inches='tight')
+    return
+
+def plot_road_network(net,subs,inset={},path=None):
+    """
+    """
+    fig = plt.figure(figsize=(40,40), dpi=72)
+    ax = fig.add_subplot(111)
+    
+    sub_x = [subs[s]['cord'][0] for s in subs]
+    sub_y = [subs[s]['cord'][1] for s in subs]
+    # Draw nodes
+    ax.scatter(sub_x,sub_y,c='dodgerblue',s=2000)
+    DrawNodes(net,ax,label='T',color='green',size=25)
+    DrawNodes(net,ax,label='R',color='black',size=2.0)
+    
+    # Draw edges
+    d = {'edges':list(net.edges()),
+         'geometry':[LineString((net.nodes[e[0]]['cord'],net.nodes[e[1]]['cord'])) \
+                     for e in net.edges()]}
+    df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    df_edges.plot(ax=ax,edgecolor="black",linewidth=2.0,linestyle="dashed")
+    
+    ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
+    
+    # Inset figures
+    for sub in inset:
+        axins = zoomed_inset_axes(ax,inset[sub]['zoom'],loc=inset[sub]['loc'])
+        axins.set_aspect(1.3)
+        # Draw nodes
+        ax.scatter([subs[sub]['cord'][0]],[subs[sub]['cord'][1]],c='dodgerblue',s=2000)
+        DrawNodes(inset[sub]['graph'],axins,label='T',color='green',size=25)
+        DrawNodes(inset[sub]['graph'],axins,label='R',color='black',size=2.0)
+        
+        # Draw edges
+        d = {'edges':list(inset[sub]['graph'].edges()),
+             'geometry':[LineString((inset[sub]['graph'].nodes[e[0]]['cord'],
+                                     inset[sub]['graph'].nodes[e[1]]['cord'])) \
+                         for e in inset[sub]['graph'].edges()]}
+        df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
+        df_edges.plot(ax=axins,edgecolor="black",linewidth=2.0,linestyle="dashed")
+        
+        axins.tick_params(bottom=False,left=False,
+                          labelleft=False,labelbottom=False)
+        mark_inset(ax, axins, loc1=inset[sub]['loc1'], 
+                   loc2=inset[sub]['loc2'], fc="none", ec="0.5")
+    
+    # Legend for the plot
+    leghands = [Line2D([0], [0], color='black', markerfacecolor='black', 
+                   marker='o',markersize=0,label='road network'),
+            Line2D([0], [0], color='white', markerfacecolor='green', 
+                   marker='o',markersize=20,label='transformer'),
+            Line2D([0], [0], color='white', markerfacecolor='black', 
+                   marker='o',markersize=20,label='road node'),
             Line2D([0], [0], color='white', markerfacecolor='dodgerblue', 
                    marker='o',markersize=20,label='substation')]
     ax.legend(handles=leghands,loc='best',ncol=1,prop={'size': 25})
     if path != None: 
-        fig.savefig("{}{}.png".format(path,'-51121-dist'),bbox_inches='tight')
+        fig.savefig("{}{}.png".format(path,'-51121-road'),bbox_inches='tight')
     return
 
 
