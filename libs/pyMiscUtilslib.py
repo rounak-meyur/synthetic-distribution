@@ -128,7 +128,7 @@ def powerflow(graph):
     # Voltages and flows
     v = np.matmul(np.linalg.inv(G),p)
     f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
-    voltage = {h:1.0-v[i] for i,h in enumerate(nodelist)}
+    voltage = {n:1.0-v[i] for i,n in enumerate(nodelist)}
     flows = {e:log(abs(f[i])) for i,e in enumerate(edgelist)}
     subnodes = [node for node in list(graph.nodes()) \
                 if graph.nodes[node]['label'] == 'S']

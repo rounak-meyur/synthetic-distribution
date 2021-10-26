@@ -17,11 +17,12 @@ rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 inppath = rootpath + "/input/"
 figpath = workpath + "/figs/"
-distpath = workpath + "/out/"
+distpath = workpath + "/out/osm-primnet/"
 
 
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet
+from pyMiscUtilslib import powerflow
 print("Imported modules")
 
 
@@ -29,7 +30,36 @@ print("Imported modules")
 sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
        150727, 150728]
-sublist = [int(x.strip("-prim-dist.gpickle")) for x in os.listdir(distpath)]
+
+
+#%% Get voltage tree
+import matplotlib.pyplot as plt
+
+for sub in sublist[1:]:
+    dist = GetDistNet(distpath,sub)
+    powerflow(dist)
+    volt = {n:dist.nodes[n]['voltage'] for n in dist}
+    reach = {n:1e-3*nx.shortest_path_length(dist,sub,n,weight='length') for n in dist}
+    
+    fig = plt.figure(figsize=(20,12))
+    ax = fig.add_subplot(111)
+    for e in dist.edges:
+        xpt = [reach[e[0]],reach[e[1]]]
+        ypt = [volt[e[0]],volt[e[1]]]
+        if dist.edges[e]['label']=='E':
+            ax.plot(xpt,ypt,color='dodgerblue',label="feeder lines")
+        elif dist.edges[e]['label']=='P':
+            ax.plot(xpt,ypt,color='black',label="primary lines")
+        else:
+            ax.plot(xpt,ypt,color='red',label="secondary lines")
+    
+    ax.set_xlabel("Distance from substation (in km)",fontsize=20)
+    ax.set_ylabel("Voltage at node (in p.u.)",fontsize=20)
+    ax.set_title("Voltage profile at peak load at different nodes",fontsize=20)
+    ax.grid(color='black',linestyle='dashed',linewidth=1.5)
+    fig.savefig("{}{}.png".format(figpath,str(sub)+'-voltage-profile'),
+                bbox_inches='tight')
+sys.exit(0)
 
 #%% Catalogue of distribution lines
 from math import exp
