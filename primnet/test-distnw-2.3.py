@@ -32,33 +32,72 @@ sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 14872
        150727, 150728]
 
 
-#%% Get voltage tree
+#%% Plot variation in voltage
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
+from matplotlib.lines import Line2D
+import numpy as np
+
+# sublist = [121144]
 
 for sub in sublist[1:]:
     dist = GetDistNet(distpath,sub)
-    powerflow(dist)
+    powerflow(dist,v0=1.02)
     volt = {n:dist.nodes[n]['voltage'] for n in dist}
     reach = {n:1e-3*nx.shortest_path_length(dist,sub,n,weight='length') for n in dist}
+    vlist = [dist.nodes[n]['voltage'] for n in dist]
+    N = dist.number_of_nodes()
     
-    fig = plt.figure(figsize=(20,12))
-    ax = fig.add_subplot(111)
-    for e in dist.edges:
-        xpt = [reach[e[0]],reach[e[1]]]
-        ypt = [volt[e[0]],volt[e[1]]]
-        if dist.edges[e]['label']=='E':
-            ax.plot(xpt,ypt,color='dodgerblue',label="feeder lines")
-        elif dist.edges[e]['label']=='P':
-            ax.plot(xpt,ypt,color='black',label="primary lines")
-        else:
-            ax.plot(xpt,ypt,color='red',label="secondary lines")
-    
-    ax.set_xlabel("Distance from substation (in km)",fontsize=20)
-    ax.set_ylabel("Voltage at node (in p.u.)",fontsize=20)
-    ax.set_title("Voltage profile at peak load at different nodes",fontsize=20)
-    ax.grid(color='black',linestyle='dashed',linewidth=1.5)
-    fig.savefig("{}{}.png".format(figpath,str(sub)+'-voltage-profile'),
+    # Voltage Histogram
+    fig1 = plt.figure(figsize=(20,12))
+    ax1 = fig1.add_subplot(111)
+    ax1.hist(vlist,bins=50,weights=np.ones(N)/N,color='royalblue',edgecolor='black')
+    ax1.set_xlim(left=0.95,right=1.05)
+    ax1.yaxis.set_major_formatter(PercentFormatter(1))
+    ax1.set_xlabel("Node voltage (in p.u.)",fontsize=25)
+    ax1.set_ylabel("Percentage of nodes",fontsize=25)
+    ax1.tick_params(axis="x", labelsize=20)
+    ax1.tick_params(axis="y", labelsize=20)
+    # ax1.grid(color='black',linestyle='dashed',linewidth=0.8)
+    fig1.savefig("{}{}.png".format(figpath,str(sub)+'-voltage-hist'),
                 bbox_inches='tight')
+    
+    # Voltage tree
+    # fig2 = plt.figure(figsize=(20,12))
+    # ax2 = fig2.add_subplot(111)
+    # for e in dist.edges:
+    #     xpt = [reach[e[0]],reach[e[1]]]
+    #     ypt = [volt[e[0]],volt[e[1]]]
+    #     if dist.edges[e]['label']=='E':
+    #         ax2.plot(xpt,ypt,color='dodgerblue',
+    #                  marker='o',markersize=10.0,linewidth=3.0)
+    #     elif dist.edges[e]['label']=='P':
+    #         ax2.plot(xpt,ypt,color='black',
+    #                  marker='o',markersize=5.0,linewidth=2.0)
+    #     else:
+    #         ax2.plot(xpt,ypt,color='red',
+    #                  marker='o',markersize=2.5,linewidth=0.5)
+    
+    # ax2.set_xlabel("Distance from substation (in km)",fontsize=25)
+    # ax2.set_ylabel("Voltage at node (in p.u.)",fontsize=25)
+    # ax2.grid(color='black',linestyle='dashed',linewidth=0.3)
+    
+    # ax2.tick_params(axis="x", labelsize=20)
+    # ax2.tick_params(axis="y", labelsize=20)
+    
+    # # Legends
+    # leghands = [Line2D([0], [0], color='dodgerblue', marker='o',markersize=10,
+    #                    label='HV feeder lines',linewidth=3.0),
+    #             Line2D([0], [0], color='black', linewidth=2.0,
+    #                marker='o',markersize=10,label='MV primary lines'),
+    #             Line2D([0], [0], color='red', linewidth=0.5,
+    #                marker='o',markersize=5,label='LV secondary lines')]
+    # ax2.legend(handles=leghands,loc='lower left',ncol=1,prop={'size': 25})
+    
+    # fig2.savefig("{}{}.png".format(figpath,str(sub)+'-voltage-profile'),
+    #             bbox_inches='tight')
+    
+    
 sys.exit(0)
 
 #%% Catalogue of distribution lines

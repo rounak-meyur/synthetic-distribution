@@ -101,10 +101,18 @@ def get_secnet(graph,secpath,homepath):
             graph.edges[e]['x'] = 0.34960/57.6 * graph.edges[e]['length']
     return graph
 
-def powerflow(graph):
+def powerflow(graph,v0=1.0):
     """
     Checks power flow solution and save dictionary of voltages.
     """
+    # Pre-processing to rectify incorrect code
+    hv_lines = [e for e in graph.edges if graph.edges[e]['label']=='E']
+    for e in hv_lines:
+        length = graph.edges[e]['length']
+        graph.edges[e]['r'] = (0.0822/363000)*length*1e-3
+        graph.edges[e]['x'] = (0.0964/363000)*length*1e-3
+    
+    # Main function begins here
     A = nx.incidence_matrix(graph,nodelist=list(graph.nodes()),
                             edgelist=list(graph.edges()),oriented=True).toarray()
     
@@ -128,11 +136,11 @@ def powerflow(graph):
     # Voltages and flows
     v = np.matmul(np.linalg.inv(G),p)
     f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
-    voltage = {n:1.0-v[i] for i,n in enumerate(nodelist)}
+    voltage = {n:v0-v[i] for i,n in enumerate(nodelist)}
     flows = {e:log(abs(f[i])) for i,e in enumerate(edgelist)}
     subnodes = [node for node in list(graph.nodes()) \
                 if graph.nodes[node]['label'] == 'S']
-    for s in subnodes: voltage[s] = 1.0
+    for s in subnodes: voltage[s] = v0
     nx.set_node_attributes(graph,voltage,'voltage')
     nx.set_edge_attributes(graph,flows,'flow')
     return
@@ -186,7 +194,7 @@ def assign_linetype(graph):
                 r = 0.0822/39690; x = 0.0964/39690
         else:
             edge_name[e] = 'OH_Penguin'
-            r = 1e-10; x = 1e-10
+            r = 0.0822/363000; x = 0.0964/363000
         
         # Assign new resitance and reactance
         graph.edges[e]['r'] = r * graph.edges[e]['length'] * 1e-3
