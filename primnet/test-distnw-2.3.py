@@ -52,7 +52,7 @@ for sub in sublist[1:]:
     fig1 = plt.figure(figsize=(20,12))
     ax1 = fig1.add_subplot(111)
     ax1.hist(vlist,bins=50,weights=np.ones(N)/N,color='royalblue',edgecolor='black')
-    ax1.set_xlim(left=0.95,right=1.05)
+    ax1.set_xlim(left=0.95,right=1.02)
     ax1.yaxis.set_major_formatter(PercentFormatter(1))
     ax1.set_xlabel("Node voltage (in p.u.)",fontsize=30)
     ax1.set_ylabel("Percentage of nodes",fontsize=30)

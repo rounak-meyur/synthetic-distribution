@@ -8,6 +8,7 @@ statistics of the synthetic and actual networks.
 """
 import os,sys
 import matplotlib.pyplot as plt
+from scipy.stats import entropy
 import numpy as np
 import networkx as nx
 import collections
@@ -45,15 +46,21 @@ def degree_dist(area_data,path):
         max_deg = min(max(list(deg_a)),max(list(deg_b)))
         cnt_a = []
         cnt_b = []
+        pa = []
+        pb = []
         for i in range(1,max_deg+1):
             if i in degreeCount_a:
                 cnt_a.append(100.0*degreeCount_a[i]/na)
+                pa.append(degreeCount_a[i]/na)
             else:
                 cnt_a.append(0)
+                pa.append(0)
             if i in degreeCount_b:
                 cnt_b.append(100.0*degreeCount_b[i]/nb)
+                pb.append(degreeCount_b[i]/nb)
             else:
                 cnt_b.append(0)
+                pb.append(0)
         
         cnt_a = tuple(cnt_a)
         cnt_b = tuple(cnt_b)
@@ -72,6 +79,9 @@ def degree_dist(area_data,path):
         ax.set_ylabel("Percentage of nodes",fontsize=20)
         ax.set_xlabel("Degree of nodes",fontsize=20)
         ax.tick_params(axis='both', labelsize=20)
+        
+        E = entropy(pa,pb)
+        ax.text(max_deg-1,40,"KL-divergence: %.2f"%E,fontsize=20)
         
         # Save the figure
         filename = "degree-distribution-"+str(sub)
@@ -141,7 +151,7 @@ def reach_dist(area_data,path):
         h1 = []
         
         for n in list(synth.nodes()):
-            hops = [nx.shortest_path_length(synth_net,n,s,weight='geo_length') if nx.has_path(synth_net,n,s) \
+            hops = [nx.shortest_path_length(synth_net,n,s,weight='length') if nx.has_path(synth_net,n,s) \
                     else 1e12 for s in sublist]
             h1.append(min(hops))
         w1 = np.ones_like(h1)/float(len(h1))
