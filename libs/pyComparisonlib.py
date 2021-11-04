@@ -40,6 +40,7 @@ def process(data, edges1, edges2, items, start, end):
                                       distance=geodist).hd
         else:
             data[grid] = np.nan
+        # print(data[grid])
         
 
 def compute_hausdorff(items, eset1, eset2, num_splits=5):

@@ -98,7 +98,7 @@ def get_suffix(delta):
         suf='00'
     return suf
 
-def node_stats(area_data,kx,ky,x0=0,y0=0):
+def node_stats(area_data,kx,ky,x0=0,y0=0,path=None):
     # Get the limits and data
     LEFT,RIGHT,BOTTOM,TOP = get_limits(area_data)
     gridlist = partitions((LEFT,RIGHT,BOTTOM,TOP),kx,ky,x0=x0,y0=y0)
@@ -124,8 +124,9 @@ def node_stats(area_data,kx,ky,x0=0,y0=0):
     plot_deviation(ax,gridlist,C_masked)
     add_colorbar(fig,ax)
     suffix = "-"+get_suffix(x0)+"-"+get_suffix(y0)
-    fig.savefig("{}{}.png".format(figpath,
-        'spatial-comparison-'+str(kx)+str(ky)+suffix),bbox_inches='tight')
+    if path != None:
+        fig.savefig("{}{}.png".format(figpath,
+            'spatial-comparison-'+str(kx)+str(ky)+suffix),bbox_inches='tight')
     return C
 
 #%% Hausdorff distance between networks
@@ -147,14 +148,15 @@ def haus_dist(area_data,kx,ky,x0=0,y0=0):
     plot_network_pair(ax, area_data)
     plot_deviation(ax,gridlist,C_masked,colormap=cm.Greens)
     add_colorbar(fig,ax,colormap=cm.Greens,
-                 vmin=0.0,vmax=max(C_masked),devname="Hausdorff distance")
+                 vmin=0.0,vmax=np.nanmax(C_vals),devname="Hausdorff distance (meters)")
     fig.savefig("{}{}.png".format(figpath,'hauss-comparison-'+str(kx)+'-'+str(ky)),
             bbox_inches='tight')
     return C
 
 
 #%% Results
-C = haus_dist(area_data,7,7)
+C = haus_dist(area_data,10,10)
 # for s in [-0.1,-0.05,0,0.05,0.1]:
 #     C = node_stats(area_data,7,7,x0=s)
 
+# C = node_stats(area_data,10,10)
