@@ -155,7 +155,7 @@ def haus_dist(area_data,kx,ky,x0=0,y0=0):
 
 
 #%% Results
-C = haus_dist(area_data,10,10)
+C = haus_dist(area_data,7,7)
 # for s in [-0.1,-0.05,0,0.05,0.1]:
 #     C = node_stats(area_data,7,7,x0=s)
 
