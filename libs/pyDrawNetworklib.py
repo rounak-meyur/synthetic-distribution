@@ -54,7 +54,7 @@ def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0,style='
 
 def plot_gdf(ax,df_edges,df_nodes,color):
     """"""
-    df_edges.plot(ax=ax,edgecolor=color,linewidth=1.0)
+    # df_edges.plot(ax=ax,edgecolor=color,linewidth=1.0)
     df_nodes.plot(ax=ax,color=color,markersize=1)
     return
 

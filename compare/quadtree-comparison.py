@@ -20,34 +20,31 @@ rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
 actpath = rootpath + "/input/actual/"
-synpath = rootpath + "/primnet/out/"
+synpath = rootpath + "/primnet/out/osm-primnet/"
 
 sys.path.append(libpath)
 from pyQuadTreelib import Point, Rect, QuadTree
-from pyGeometrylib import Link
 from pyExtractDatalib import GetDistNet,get_areadata
 from pyDrawNetworklib import plot_gdf
 print("Imported modules")
 
 
 
-
+#%% Data Extraction
 sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
        150727, 150728]
 synth_net = GetDistNet(synpath,sublist)
-sgeom = nx.get_edge_attributes(synth_net,'geometry')
-synthgeom = {e:Link(sgeom[e]) for e in sgeom}
-glength = {e:synthgeom[e].geod_length for e in sgeom}
-nx.set_edge_attributes(synth_net,glength,'geo_length')
+print("Synthetic network extracted")
 
-
-# Area specifications
 #areas = {'patrick_henry':194,'mcbryde':9001,'hethwood':7001}
 areas = {'patrick_henry':194,'mcbryde':9001}
 
 area_data = {area:get_areadata(actpath,area,root,synth_net) \
                       for area,root in areas.items()}
+print("Area Data extracted and stored")
+
+
 
 # Get limits for the geographical region
 lims = np.empty(shape=(len(area_data),4))
@@ -77,8 +74,9 @@ for area in area_data:
 
 
 qtree = QuadTree(domain, 30)
+count = 0
 for point in points:
-    qtree.insert(point)
+    count += qtree.insert(point)
 
 A = {}
 A = qtree.point_stat(A)
@@ -128,7 +126,7 @@ C_valid = [C_masked.data[i] for i in range(len(C)) if not C_masked.mask[i]]
 c = PolyCollection(verts_valid)
 c.set_array(C_masked)
 c.set_cmap(colormap)
-ax.add_collection(c)
+# ax.add_collection(c)
 
 # Get the boxes for absent actual data
 verts_invalid = [get_polygon(bound) for i,bound in enumerate(C) \
@@ -160,7 +158,7 @@ leg_data = [Line2D([0], [0], color='orangered', markerfacecolor='orangered',
             Patch(facecolor='white', edgecolor='black', hatch="./",
                          label='Grids with no actual network data')]
 
-ax.legend(handles=leg_data,loc='best',ncol=1,prop={'size': 8})
+# ax.legend(handles=leg_data,loc='best',ncol=1,prop={'size': 8})
 
 
 
