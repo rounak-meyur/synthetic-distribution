@@ -51,14 +51,21 @@ sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 14872
 #%% Road network
 from pyDrawNetworklib import plot_road_network
 from pyExtractDatalib import GetPrimRoad
-roadpath = outpath + "osm-prim-master/"
-subdata = {s:subs[s] for s in [147793]}
-roadnet = GetPrimRoad(roadpath,147793)
-plot_road_network(roadnet,subdata,path=figpath+"147793")
-sys.exit(0)
-#%% Combine primary and secondary network
 from pyDrawNetworklib import plot_network
 from pyExtractDatalib import GetDistNet
+
+distpath = outpath + "osm-primnet/"
+roadpath = outpath + "osm-prim-master/"
+sub = 121143
+subdata = {s:subs[s] for s in [sub]}
+roadnet = GetPrimRoad(roadpath,sub)
+synth_net = GetDistNet(distpath,sub)
+plot_road_network(roadnet,subdata,path=figpath+str(sub))
+plot_network(synth_net,{},figpath+str(sub)+"-prim",with_secnet=False)
+plot_network(synth_net,{},figpath+str(sub)+"-all",with_secnet=True)
+sys.exit(0)
+#%% Combine primary and secondary network
+
 distpath = outpath + "osm-primnet/"
 synth_net = GetDistNet(distpath,sublist)
 small_synth_net1 = GetDistNet(distpath,121143)

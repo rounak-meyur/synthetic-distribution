@@ -85,7 +85,7 @@ class MILP_primary:
     network for covering a given set of local transformers through the edges of
     an existing road network.
     """
-    def __init__(self,graph,grbpath=None):
+    def __init__(self,graph,grbpath=None,flowcap=1000,feeder_buffer=1):
         """
         graph: the base graph which has the list of possible edges.
         tnodes: dictionary of transformer nodes with power consumption as value.
@@ -115,8 +115,7 @@ class MILP_primary:
         
         # Get feeder rating and number
         total_cap = sum(LOAD.values())*1e-3 # total kVA load to be served
-        flow_cap = 1000 # Maximum feeder capacity in kVA
-        feeder_cap = int(total_cap/1000)+1 # Maximum number of feeders
+        feeder_cap = int(total_cap/1000)+feeder_buffer # Maximum number of feeders
         
         # Create the optimization model
         self.model = grb.Model(name="Get Primary Network")
@@ -125,7 +124,7 @@ class MILP_primary:
         self.masterTree()
         self.powerflow()
         self.radiality()
-        self.flowconstraint(M=flow_cap)
+        self.flowconstraint(M=flowcap)
         self.connectivity()
         self.limit_feeder(M=feeder_cap)
         self.objective()
@@ -276,7 +275,7 @@ class Primary:
     First the set of possible edges are identified from the links in road net-
     -work and transformer connections.
     """
-    def __init__(self,subdata,path,feedcap=800,div=8):
+    def __init__(self,subdata,path,feedcap=1000,div=10):
         """
         """
         self.subdata = subdata
@@ -315,14 +314,16 @@ class Primary:
                 self.get_partitions(sglist)
         return
         
-    def get_sub_network(self,secpath=None,inppath=None,grbpath=None):
+    def get_sub_network(self,secpath=None,inppath=None,grbpath=None,
+                        fcap=1000,fbuf=1):
         """
         """
         # Optimizaton problem to get the primary network
         primary = []; roots = []; tnodes = []
         for nlist in list(nx.connected_components(self.graph)):
             subgraph = nx.subgraph(self.graph,list(nlist))
-            M = MILP_primary(subgraph,grbpath=grbpath)
+            M = MILP_primary(subgraph,grbpath=grbpath,flowcap=fcap,
+                             feeder_buffer=fbuf)
             print("\n\n\n")
             primary += M.optimal_edges
             roots += M.roots

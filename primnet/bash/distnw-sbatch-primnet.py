@@ -50,7 +50,8 @@ start_time = time.time()
 P = Primary(sub_data,tmpPath+dirname)
 
 
-dist_net = P.get_sub_network(tmpPath+'osm-sec-network/',inpPath,tmpPath)
+dist_net = P.get_sub_network(tmpPath+'osm-sec-network/',inpPath,tmpPath,
+                             fcap=1500,fbuf=2)
 end_time = time.time()
 time_taken = end_time - start_time
 
