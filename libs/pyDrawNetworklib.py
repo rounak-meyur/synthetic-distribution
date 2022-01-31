@@ -18,7 +18,8 @@ from matplotlib.lines import Line2D
 from matplotlib.collections import PolyCollection
 
 #%% Network Geometries
-def DrawNodes(synth_graph,ax,label=['S','T','H'],color='green',size=25):
+def DrawNodes(synth_graph,ax,label=['S','T','H'],color='green',size=25,
+              alpha=1.0):
     """
     Get the node geometries in the network graph for the specified node label.
     """
@@ -33,10 +34,11 @@ def DrawNodes(synth_graph,ax,label=['S','T','H'],color='green',size=25):
     d = {'nodes':nodelist,
          'geometry':[Point(synth_graph.nodes[n]['cord']) for n in nodelist]}
     df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_nodes.plot(ax=ax,color=color,markersize=size)
+    df_nodes.plot(ax=ax,color=color,markersize=size,alpha=alpha)
     return
 
-def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0,style='solid'):
+def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0,
+              style='solid',alpha=1.0):
     """
     """
     # Get the nodes for the specified label
@@ -49,7 +51,7 @@ def DrawEdges(synth_graph,ax,label=['P','E','S'],color='black',width=2.0,style='
     d = {'edges':edgelist,
          'geometry':[synth_graph.edges[e]['geometry'] for e in edgelist]}
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_edges.plot(ax=ax,edgecolor=color,linewidth=width,linestyle=style)
+    df_edges.plot(ax=ax,edgecolor=color,linewidth=width,linestyle=style,alpha=alpha)
     return
 
 def plot_gdf(ax,df_edges,df_nodes,color):

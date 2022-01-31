@@ -18,7 +18,7 @@ workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
-distpath = rootpath + "/primnet/out/prim-network/"
+distpath = rootpath + "/primnet/out/osm-primnet/"
 outpath = workpath + "/out/"
 sys.path.append(libpath)
 
