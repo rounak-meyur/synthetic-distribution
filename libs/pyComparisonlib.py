@@ -5,10 +5,8 @@ Created on Wed Feb 12 12:07:26 2020
 Author: Rounak Meyur
 """
 
-import networkx as nx
 import numpy as np
 import threading
-import itertools
 from pyGeometrylib import Link,geodist
 from pygeodesy import hausdorff_
 
@@ -63,13 +61,6 @@ def compute_hausdorff(items, eset1, eset2, num_splits=5):
         t.join()
     return D
 
-#%% Graph motifs
-def count_motifs(g,target):
-    count = 0
-    for sub_nodes in itertools.combinations(g.nodes(),len(target.nodes())):
-        subg = g.subgraph(sub_nodes)
-        if nx.is_connected(subg) and nx.is_isomorphic(subg, target):
-            count += 1
-    return count
+
 
     

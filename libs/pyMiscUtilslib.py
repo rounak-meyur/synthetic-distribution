@@ -87,9 +87,13 @@ def get_secnet(graph,secpath,homepath):
     # Add new node attributes
     hnodes = [n for n in sec_graph if n not in tnodes]
     for n in hnodes:
-        graph.nodes[n]['cord'] = hcord[n]
-        graph.nodes[n]['load'] = hload[n]
+        graph.nodes[n]['cord'] = secnet.nodes[n]['cord']
         graph.nodes[n]['label'] = 'H'
+        if n in hload:
+            graph.nodes[n]['load'] = hload[n]
+        else:
+            # use a sample house as the load
+            graph.nodes[n]['load'] = hload[[n for n in hload][0]]
     
     for e in graph.edges:
         if e in sec_graph.edges:
@@ -137,7 +141,7 @@ def powerflow(graph,v0=1.0):
     v = np.matmul(np.linalg.inv(G),p)
     f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
     voltage = {n:v0-v[i] for i,n in enumerate(nodelist)}
-    flows = {e:log(abs(f[i])) for i,e in enumerate(edgelist)}
+    flows = {e:log(abs(f[i])+1e-10) for i,e in enumerate(edgelist)}
     subnodes = [node for node in list(graph.nodes()) \
                 if graph.nodes[node]['label'] == 'S']
     for s in subnodes: voltage[s] = v0
