@@ -12,6 +12,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import geopandas as gpd
 import numpy as np
+import itertools
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
@@ -24,7 +25,7 @@ distpath = rootpath + "/primnet/out/osm-primnet/"
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet
 from pyDrawNetworklib import DrawNodes, DrawEdges
-from pyResiliencelib import count_motif
+# from pyResiliencelib import count_motif
 print("Imported modules")
 
 
@@ -43,10 +44,45 @@ urban_sub = [s for s in sublist if s in urban_sublist]
 
 #%%
 
+def count_motif(g):
+    count = 0
+    for node_group in itertools.combinations(g.nodes(),4):
+        n1,n2,n3,n4 = node_group
+        if (((n1,n2) in g.edges) and ((n1,n3) in g.edges) and ((n1,n4) in g.edges)) \
+            or (((n2,n1) in g.edges) and ((n2,n3) in g.edges) and ((n2,n4) in g.edges)) \
+               or (((n3,n1) in g.edges) and ((n3,n2) in g.edges) and ((n3,n4) in g.edges)) \
+                   or (((n4,n1) in g.edges) and ((n4,n2) in g.edges) and ((n4,n3) in g.edges)):
+            count += 1
+    return count
+
 dist = GetDistNet(distpath,121144)
-c1 = count_motif(dist,t=1)
+c1 = count_motif(dist)
+
 print(c1)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#%%
 # mont_sub = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
 #        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
 #        150727, 150728]
