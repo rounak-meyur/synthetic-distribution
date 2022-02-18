@@ -12,7 +12,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import geopandas as gpd
 import numpy as np
-import itertools
+from itertools import combinations as comb
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
@@ -22,43 +22,42 @@ figpath = workpath + "/figs/"
 distpath = rootpath + "/primnet/out/osm-primnet/"
 
 
-sys.path.append(libpath)
-from pyExtractDatalib import GetDistNet
-from pyDrawNetworklib import DrawNodes, DrawEdges
+# sys.path.append(libpath)
+# from pyExtractDatalib import GetDistNet
+# from pyDrawNetworklib import DrawNodes, DrawEdges
 # from pyResiliencelib import count_motif
-print("Imported modules")
+# print("Imported modules")
 
 
 
 
-sublist = [int(x.strip("-dist-net.gpickle")) for x in os.listdir(distpath)]
-with open(inppath+"urban-sublist.txt") as f:
-    urban_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
-with open(inppath+"rural-sublist.txt") as f:
-    rural_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
+# sublist = [int(x.strip("-dist-net.gpickle")) for x in os.listdir(distpath)]
+# with open(inppath+"urban-sublist.txt") as f:
+#     urban_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
+# with open(inppath+"rural-sublist.txt") as f:
+#     rural_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
 
-rural_sub = [s for s in sublist if s in rural_sublist]
-urban_sub = [s for s in sublist if s in urban_sublist]
+# rural_sub = [s for s in sublist if s in rural_sublist]
+# urban_sub = [s for s in sublist if s in urban_sublist]
 
 
 
 #%%
 
-def count_motif(g):
-    count = 0
-    for node_group in itertools.combinations(g.nodes(),4):
-        n1,n2,n3,n4 = node_group
-        if (((n1,n2) in g.edges) and ((n1,n3) in g.edges) and ((n1,n4) in g.edges)) \
-            or (((n2,n1) in g.edges) and ((n2,n3) in g.edges) and ((n2,n4) in g.edges)) \
-               or (((n3,n1) in g.edges) and ((n3,n2) in g.edges) and ((n3,n4) in g.edges)) \
-                   or (((n4,n1) in g.edges) and ((n4,n2) in g.edges) and ((n4,n3) in g.edges)):
-            count += 1
-    return count
+def get_motifs(g):
+    motifs = []
+    for node_group in comb(g.nodes(),4):
+        if len([e for e in comb(node_group,2) if e in g.edges])==3:
+            motifs.append(node_group)
+    return motifs
 
-dist = GetDistNet(distpath,121144)
-c1 = count_motif(dist)
+tree = nx.random_tree(n=100, seed=0)
+# print(nx.forest_str(tree, sources=[0]))
+motifs = get_motifs(tree)
 
-print(c1)
+
+
+# dist = GetDistNet(distpath,121144)
 
 
 
