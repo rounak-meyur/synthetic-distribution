@@ -7,19 +7,19 @@ Created on Tue Mar 30 21:05:36 2021
 Description: This program plots the distribution network of Virginia state.
 """
 
-import sys,os
-import networkx as nx
-import matplotlib.pyplot as plt
-import geopandas as gpd
-import numpy as np
-from itertools import combinations as comb
+# import sys,os
+# import networkx as nx
+# import matplotlib.pyplot as plt
+# import geopandas as gpd
+# import numpy as np
+# from itertools import combinations as comb
 
-workpath = os.getcwd()
-rootpath = os.path.dirname(workpath)
-libpath = rootpath + "/libs/"
-inppath = rootpath + "/input/"
-figpath = workpath + "/figs/"
-distpath = rootpath + "/primnet/out/osm-primnet/"
+# workpath = os.getcwd()
+# rootpath = os.path.dirname(workpath)
+# libpath = rootpath + "/libs/"
+# inppath = rootpath + "/input/"
+# figpath = workpath + "/figs/"
+# distpath = rootpath + "/primnet/out/osm-primnet/"
 
 
 # sys.path.append(libpath)
@@ -43,17 +43,18 @@ distpath = rootpath + "/primnet/out/osm-primnet/"
 
 
 #%%
-
+import itertools
+import networkx as nx
+import numpy as np
 def get_motifs(g):
-    motifs = []
-    for node_group in comb(g.nodes(),4):
-        if len([e for e in comb(node_group,2) if e in g.edges])==3:
-            motifs.append(node_group)
-    return motifs
+    nodes = g.nodes()
+    quadlets = list(itertools.combinations(nodes,4))
+    
+    return
 
-tree = nx.random_tree(n=100, seed=0)
-# print(nx.forest_str(tree, sources=[0]))
-motifs = get_motifs(tree)
+tree = nx.random_tree(n=5, seed=0)
+print(nx.forest_str(tree, sources=[0]))
+get_motifs(tree)
 
 
 
