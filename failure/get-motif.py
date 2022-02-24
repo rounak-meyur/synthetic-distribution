@@ -105,9 +105,9 @@ for sub in sublist:
 df_nodes = gpd.GeoDataFrame({'nodes':nodelist,'geometry':node_geom,
                               'hop':node_hop,'reach':node_reach},crs="EPSG:4326")
 
-
+df_nodes.to_file(workpath+"va-stat-989.shp")
 #%% Plot the motif count
-fig = plt.figure(figsize=(35,30),dpi=72)
+fig = plt.figure(figsize=(100,60),dpi=72)
 ax = fig.add_subplot(1,1,1)
 
 divider = make_axes_locatable(ax)
@@ -119,7 +119,7 @@ cax.tick_params(labelsize=50)
 ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
 fig.savefig("{}{}.png".format(figpath,'va-hops'),bbox_inches='tight')
 
-fig = plt.figure(figsize=(35,30),dpi=72)
+fig = plt.figure(figsize=(100,60),dpi=72)
 ax = fig.add_subplot(1,1,1)
 
 divider = make_axes_locatable(ax)
