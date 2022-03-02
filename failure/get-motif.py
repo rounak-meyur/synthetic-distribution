@@ -19,13 +19,30 @@ workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
+inppath = rootpath + "/input/"
 distpath = rootpath + "/primnet/out/osm-primnet/"
 
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet
 print("Imported modules")
 
+#%% Get substations in rural and urban regions
+sublist = [int(x.strip("-dist-net.gpickle")) for x in os.listdir(distpath)]
+with open(inppath+"urban-sublist.txt") as f:
+    urban_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
+with open(inppath+"rural-sublist.txt") as f:
+    rural_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
 
+with open(inppath+"sublist.txt") as f:
+    rem_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
+
+rural_sub = [s for s in sublist if s in rural_sublist]
+urban_sub = [s for s in sublist if s in urban_sublist]
+
+remlist = {'R':len([s for s in rem_sublist if s in rural_sublist]),
+           'U':len([s for s in rem_sublist if s in urban_sublist])}
+
+sys.exit(0)
 
 #%% 4-node Motif Counter Visualization on Map
 # with open(workpath+"/motif-count.txt",'r') as f:
@@ -132,15 +149,7 @@ ax.tick_params(left=False,bottom=False,labelleft=False,labelbottom=False)
 fig.savefig("{}{}.png".format(figpath,'va-reach'),bbox_inches='tight')
 
 
-#%% Get substations in rural and urban regions
-# sublist = [int(x.strip("-dist-net.gpickle")) for x in os.listdir(distpath)]
-# with open(inppath+"urban-sublist.txt") as f:
-#     urban_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
-# with open(inppath+"rural-sublist.txt") as f:
-#     rural_sublist = [int(x) for x in f.readlines()[0].strip('\n').split(' ')]
 
-# rural_sub = [s for s in sublist if s in rural_sublist]
-# urban_sub = [s for s in sublist if s in urban_sublist]
 
 #%%
 # mont_sub = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
