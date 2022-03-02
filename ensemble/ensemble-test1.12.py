@@ -14,8 +14,11 @@ import sys,os
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-import geopandas as gpd
-from shapely.geometry import Point
+import pandas as pd
+import seaborn as sns
+import itertools
+from matplotlib.patches import Patch
+
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
@@ -71,60 +74,31 @@ def run_powerflow(sub,i,homes,rating):
 
 #%%
 
-def generate_bars(ax,ax0,data1,data2):
-    width = 0.003
-    bins = np.linspace(0.95,1.05,15)
-    bincenters = 0.5*(bins[1:]+bins[:-1])
-    y1,_,_ = ax0.hist(data1,bins=bins)
-    y2,_,_ = ax0.hist(data2,bins=bins)
-    
-    # Data 1
-    y1_mean = np.mean(y1,axis=0)
-    y1_var = np.var(y1,axis=0)
-    y1_err = np.sqrt(y1_var)
-    x1 = bincenters - width/2
-    
-    # Data 2
-    y2_mean = np.mean(y2,axis=0)
-    y2_var = np.var(y2,axis=0)
-    y2_err = np.sqrt(y2_var)
-    x2 = bincenters + width/2
-    
-    # Add bar plots to the axis object
-    ax.bar(x1, y1_mean, width=width, color='royalblue', yerr=y1_err, capsize=5.0, 
-           error_kw = {'mew':1.5, 'elinewidth':2}, label='LV level penetration')
-    ax.bar(x2, y2_mean, width=width, color='crimson', yerr=y2_err, capsize=5.0, 
-           error_kw = {'mew':1.5, 'elinewidth':2}, label='MV level penetration')
-    ax.legend(loc='best',prop={'size': 14})
-    return
-
-def draw_barplot(df,groups,ax=None,adopt=90,rate=4800):
-    if ax == None:
-        fig = plt.figure(figsize=(20,20))
-        ax = fig.add_subplot(1,1,1)
+def draw_barplot(df,groups,ax):
     
     # Draw the bar plot
     num_stack = len(groups)
     colors = sns.color_palette("Set3")[:num_stack]
-    hours = df.hour.unique()
-    for i,g in enumerate(df.groupby("stack",sort=False)):
-        ax = sns.barplot(data=g[1], x="hour",y="count",hue="group",
+    pen = df.pen.unique()
+    for i,g in enumerate(list(df.groupby("stack",sort=False))[::-1]):
+        ax = sns.barplot(data=g[1], x="pen",y="count",hue="group",
                               palette=[colors[i]],ax=ax,
                               zorder=-i, edgecolor="k",errwidth=5)
     
     
     # Format other stuff
+    ax.set_xticklabels([100.0*p for p in pen])
     ax.tick_params(axis='y',labelsize=40)
-    ax.tick_params(axis='x',labelsize=40,rotation=90)
-    ax.set_ylabel("Number of residences",fontsize=50)
-    ax.set_xlabel("Hours",fontsize=50)
-    ax.set_title("Adoption percentage: "+str(adopt)+"%",fontsize=50)
-    ax.set_ylim(bottom=0,top=80)
+    ax.tick_params(axis='x',labelsize=40)
+    ax.set_ylabel("Percentage of nodes (%)",fontsize=50)
+    ax.set_xlabel("Percentage Penetration (%)",fontsize=50)
+    ax.set_title("PV penetration in urban feeder",fontsize=50)
+    # ax.set_ylim(bottom=0,top=1000)
 
 
     hatches = itertools.cycle(['/', ''])
     for i, bar in enumerate(ax.patches):
-        if i%(len(hours)) == 0:
+        if i%(len(pen)) == 0:
             hatch = next(hatches)
         bar.set_hatch(hatch)
 
@@ -132,55 +106,17 @@ def draw_barplot(df,groups,ax=None,adopt=90,rate=4800):
     han1 = [Patch(facecolor=color, edgecolor='black', label=label) \
                   for label, color in zip(groups, colors)]
     han2 = [Patch(facecolor="white",edgecolor='black',
-                  label="Distributed optimization",hatch='/'),
+                  label="MV level penetration",hatch='/'),
                    Patch(facecolor="white",edgecolor='black',
-                         label="Individual optimization",hatch='')]
-    leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 30},loc='upper right')
-    ax.legend(handles=han2,ncol=1,prop={'size': 30},loc='upper left')
+                         label="LV level penetration",hatch='')]
+    leg1 = ax.legend(handles=han1,ncol=1,prop={'size': 30},loc='upper left')
+    ax.legend(handles=han2,ncol=1,prop={'size': 30},loc='upper center')
     ax.add_artist(leg1)
     return ax
 
 
-#%% Plot the histogram
-# fig0 = plt.figure()
-# ax0 = fig0.add_subplot(111)
 
-# fig = plt.figure(figsize=(24,6))
-# ax1 = fig.add_subplot(131)
-# ax2 = fig.add_subplot(132)
-# ax3 = fig.add_subplot(133)
-
-# generate_bars(ax1,ax0,v_random1_lv,v_random1_mv)
-# ax1.set_xlabel("Voltage in pu",fontsize=15)
-# ax1.set_ylabel("Percentage of nodes",fontsize=15)
-# ax1.yaxis.set_major_formatter(PercentFormatter(N))
-# ax1.set_title("PV penetration of 30% in LV and MV networks",fontsize=15)
-
-# generate_bars(ax2,ax0,v_random2_lv,v_random2_mv)
-# ax2.set_xlabel("Voltage in pu",fontsize=15)
-# ax2.set_ylabel("Percentage of nodes",fontsize=15)
-# ax2.yaxis.set_major_formatter(PercentFormatter(N))
-# ax2.set_title("PV penetration of 50% in LV and MV networks",fontsize=15)
-
-# generate_bars(ax3,ax0,v_random3_lv,v_random3_mv)
-# ax3.set_xlabel("Voltage in pu",fontsize=15)
-# ax3.set_ylabel("Percentage of nodes",fontsize=15)
-# ax3.yaxis.set_major_formatter(PercentFormatter(N))
-# ax3.set_title("PV penetration of 80% in LV and MV networks",fontsize=15)
-
-# fig.savefig("{}{}.png".format(figpath+str(sub),
-#                               '-volt-penetration-ens-comp'),
-#             bbox_inches='tight')
-
-
-
-#%% Plot outliers
-import pandas as pd
-import seaborn as sns
-import itertools
-from matplotlib.patches import Patch
-
-# Input
+#%% Input
 sub = 147793
 # sub = 113088
 # sub = 121248
@@ -209,16 +145,17 @@ data = {'count':[],'stack':[],'pen':[],'group':[]}
 v_range = [1.00,1.03,1.05]
 v_str = [str(v_range[i])+"-"+str(v_range[i+1])+" p.u." \
               for i in range(len(v_range)-1)] + ["> "+str(v_range[-1])+" p.u."]
-
+v_str = v_str[::-1]
 pen_range = [0.3,0.5,0.8]
     
 for k in range(20):
     # Get voltage for MV penetration
     for pen in pen_range:
+        print("MV Penetration:",pen,"Network",k+1)
         m_rating = 1e-3*pen*total_load/m_host
         m_voltages = run_powerflow(sub,k+1,prim_solar,m_rating)
         for i in range(len(v_range)):
-            num_mvolt = len([v for v in m_voltages if v>=v_range[i]])
+            num_mvolt = len([v for v in m_voltages if v>=v_range[i]])*(100.0/N)
             data['count'].append(num_mvolt)
             data['stack'].append(v_str[i])
             data['pen'].append(pen)
@@ -227,16 +164,22 @@ for k in range(20):
     
     # Get voltage for LV penetration
     for pen in pen_range:
+        print("LV Penetration:",pen,"Network",k+1)
         l_rating = 1e-3*pen*total_load/n_solar
         l_voltages = run_powerflow(sub,k+1,res_solar,l_rating)
         for i in range(len(v_range)):
-            num_mvolt = len([v for v in m_voltages if v>=v_range[i]])
-            data['count'].append(num_mvolt)
+            num_lvolt = len([v for v in l_voltages if v>=v_range[i]])*(100.0/N)
+            data['count'].append(num_lvolt)
             data['stack'].append(v_str[i])
             data['pen'].append(pen)
-            data['group'].append("MV level penetration")
+            data['group'].append("LV level penetration")
     
 
 
 df = pd.DataFrame(data)
-ax = draw_barplot(df,v_str,ax,adopt=adopt,rate=rate)
+
+#%% Plot and save figure
+fig = plt.figure(figsize=(20,20))
+ax = fig.add_subplot(1,1,1)
+ax = draw_barplot(df,v_str,ax)
+fig.savefig(figpath+str(sub)+"-out-limit.png",bbox_inches='tight')

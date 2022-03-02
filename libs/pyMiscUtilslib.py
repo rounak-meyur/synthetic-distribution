@@ -112,7 +112,10 @@ def powerflow(graph,v0=1.0):
     # Pre-processing to rectify incorrect code
     hv_lines = [e for e in graph.edges if graph.edges[e]['label']=='E']
     for e in hv_lines:
-        length = graph.edges[e]['length']
+        try:
+            length = graph.edges[e]['length']
+        except:
+            length = graph.edges[e]['geo_length']
         graph.edges[e]['r'] = (0.0822/363000)*length*1e-3
         graph.edges[e]['x'] = (0.0964/363000)*length*1e-3
     
@@ -201,8 +204,12 @@ def assign_linetype(graph):
             r = 0.0822/363000; x = 0.0964/363000
         
         # Assign new resitance and reactance
-        graph.edges[e]['r'] = r * graph.edges[e]['length'] * 1e-3
-        graph.edges[e]['x'] = x * graph.edges[e]['length'] * 1e-3
+        try:
+            l = graph.edges[e]['length']
+        except:
+            l = graph.edges[e]['geo_length']
+        graph.edges[e]['r'] = r * l * 1e-3
+        graph.edges[e]['x'] = x * l * 1e-3
     
     # Add new edge attribute
     nx.set_edge_attributes(graph,edge_name,'type')
