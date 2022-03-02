@@ -225,4 +225,3 @@ ax3.set_title("PV penetration of 80% in LV and MV networks",fontsize=15)
 
 fig.savefig("{}{}.png".format(figpath+str(sub),'-volt-penetration-comp'),
             bbox_inches='tight')
-
