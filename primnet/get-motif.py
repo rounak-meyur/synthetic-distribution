@@ -4,27 +4,30 @@ Created on Tue Mar 30 21:05:36 2021
 
 Author: Rounak
 
-Description: This program plots the distribution network of Virginia state.
+Description: This program plots the motifs in distribution network of Virginia.
 """
 
 import sys,os
 import geopandas as gpd
 import networkx as nx
+from scipy.special import comb
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib import cm
+import itertools
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
 figpath = workpath + "/figs/"
 inppath = rootpath + "/input/"
-distpath = rootpath + "/primnet/out/osm-primnet/"
+distpath = workpath + "/out/osm-primnet/"
 
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet
 print("Imported modules")
+
 
 #%% Get substations in rural and urban regions
 sublist = [int(x.strip("-dist-net.gpickle")) for x in os.listdir(distpath)]
@@ -42,7 +45,54 @@ urban_sub = [s for s in sublist if s in urban_sublist]
 remlist = {'R':len([s for s in rem_sublist if s in rural_sublist]),
            'U':len([s for s in rem_sublist if s in urban_sublist])}
 
+
+
+ 
+#%% k node star motif
+k = 4
+
+data = ''
+for sub in sublist:
+    dist = GetDistNet(distpath,sub)
+    node_deg = {n:nx.degree(dist,n) for n in dist if nx.degree(dist,n)>=k-1}
+    count = sum([comb(node_deg[n],k-1) for n in node_deg])
+    data += '\t'.join([str(sub), str(dist.number_of_nodes()), str(int(count))])+'\n'
+
+with open(workpath+"/out/4star-motif.txt",'w') as f:
+    f.write(data)
+
+#%% Plot
+with open(workpath+"/out/4star-motif.txt") as f:
+    lines = f.readlines()
+kstar_motif = {}
+for line in lines:
+    temp = line.strip('\n').split('\t')
+    kstar_motif[int(temp[0])] = (int(temp[1]),int(temp[2]))
+
+
+def scatter_plot(subs,ax,motifs,color='r',size=10,label='all areas'):
+    all_nodes = [motifs[s][0] for s in subs]
+    star_motifs = [motifs[s][1] for s in subs]
+    ax.scatter(all_nodes,star_motifs,c=color,s=size,label=label)
+    return
+
+fig = plt.figure(figsize=(30,30))
+ax = fig.add_subplot(111)
+
+# scatter_plot(sublist,ax,kstar_motif,color='green',label='all areas')
+scatter_plot(urban_sub,ax,kstar_motif,color='blue',size=500,label='urban areas')
+scatter_plot(rural_sub,ax,kstar_motif,color='red',size=500,label='rural areas')
+
+ax.set_xlabel("Number of nodes",fontsize=40)
+ax.set_ylabel("Number of star motifs",fontsize=40)
+
+ax.legend(prop={'size': 50})
+ax.tick_params(axis='both', labelsize=40)
+fig.savefig("{}{}.png".format(figpath,'4star-motif-comp'),bbox_inches='tight')
+
 sys.exit(0)
+
+
 
 #%% 4-node Motif Counter Visualization on Map
 # with open(workpath+"/motif-count.txt",'r') as f:
