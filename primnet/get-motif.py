@@ -30,7 +30,7 @@ print("Imported modules")
 
 
 sublist = [int(x.strip("-dist-net.gpickle")) for x in os.listdir(distpath)]
-
+k = 5
 
 #%% k-path motif
 def count_k_path(tree,k):
@@ -56,21 +56,21 @@ def count_k_path(tree,k):
         motif += len(P[(v,k-1)])
     return int(motif/2)
 
+#%% k-path motif
 
 data = ''
 for sub in sublist:
     dist = GetDistNet(distpath,sub)
-    motif = count_k_path(dist,k=4)
+    motif = count_k_path(dist,k)
     num_nodes = dist.number_of_nodes()
     data += '\t'.join([str(sub), str(num_nodes), str(motif)])+'\n'
 
 
-with open(workpath+"/out/4path-motif.txt",'w') as f:
+with open(workpath+"/out/"+str(k)+"path-motif.txt",'w') as f:
     f.write(data)
 
-sys.exit(0)
+
 #%% k-star motif
-k = 4
 
 data = ''
 for sub in sublist:
@@ -79,5 +79,5 @@ for sub in sublist:
     count = sum([comb(node_deg[n],k-1) for n in node_deg])
     data += '\t'.join([str(sub), str(dist.number_of_nodes()), str(int(count))])+'\n'
 
-with open(workpath+"/out/4star-motif.txt",'w') as f:
+with open(workpath+"/out/"+str(k)+"star-motif.txt",'w') as f:
     f.write(data)

@@ -42,14 +42,17 @@ urban_sub = [s for s in sublist if s in urban_sublist]
 
 
 #%% Get motif data in rural and urban areas
-with open(workpath+"/out/4star-motif.txt") as f:
+
+k = 5
+
+with open(workpath+"/out/"+str(k)+"star-motif.txt") as f:
     lines = f.readlines()
 kstar_motif = {}
 for line in lines:
     temp = line.strip('\n').split('\t')
     kstar_motif[int(temp[0])] = (int(temp[1]),int(temp[2]))
     
-with open(workpath+"/out/4path-motif.txt") as f:
+with open(workpath+"/out/"+str(k)+"path-motif.txt") as f:
     lines = f.readlines()
 kpath_motif = {}
 for line in lines:
@@ -71,13 +74,13 @@ ax = fig.add_subplot(111)
 scatter_plot(urban_sub,ax,kstar_motif,color='red',size=300,label='urban areas')
 scatter_plot(rural_sub,ax,kstar_motif,color='blue',size=300,label='rural areas')
 
-ax.set_xlabel("Number of nodes",fontsize=60)
-ax.set_ylabel("Number of star motifs",fontsize=60)
-ax.set_title("4-node star motifs",fontsize=60)
+ax.set_xlabel("Size of network",fontsize=60)
+ax.set_ylabel("Number of motifs",fontsize=60)
+ax.set_title(str(k)+"-node star motifs",fontsize=60)
 
 ax.legend(prop={'size': 50})
 ax.tick_params(axis='both', labelsize=50)
-fig.savefig("{}{}.png".format(figpath,'4star-motif-comp'),bbox_inches='tight')
+fig.savefig("{}{}.png".format(figpath,str(k)+'star-motif-comp'),bbox_inches='tight')
 
 
 
@@ -89,13 +92,13 @@ ax = fig.add_subplot(111)
 scatter_plot(urban_sub,ax,kpath_motif,color='red',size=300,label='urban areas')
 scatter_plot(rural_sub,ax,kpath_motif,color='blue',size=300,label='rural areas')
 
-ax.set_xlabel("Number of nodes",fontsize=60)
-ax.set_ylabel("Number of star motifs",fontsize=60)
-ax.set_title("4-node path motifs",fontsize=60)
+ax.set_xlabel("Size of network",fontsize=60)
+ax.set_ylabel("Number of motifs",fontsize=60)
+ax.set_title(str(k)+"-node path motifs",fontsize=60)
 
 ax.legend(prop={'size': 50})
 ax.tick_params(axis='both', labelsize=50)
-fig.savefig("{}{}.png".format(figpath,'4path-motif-comp'),bbox_inches='tight')
+fig.savefig("{}{}.png".format(figpath,str(k)+'path-motif-comp'),bbox_inches='tight')
 
 
 
