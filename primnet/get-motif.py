@@ -8,14 +8,9 @@ Description: This program plots the motifs in distribution network of Virginia.
 """
 
 import sys,os
-import geopandas as gpd
 import networkx as nx
 from scipy.special import comb
-from shapely.geometry import Point
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib import cm
-import itertools
+
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
