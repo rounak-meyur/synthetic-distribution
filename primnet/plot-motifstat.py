@@ -37,7 +37,7 @@ urban_sub = [s for s in sublist if s in urban_sublist]
 
 #%% Get motif data in rural and urban areas
 
-k = 4
+k = 5
 
 with open(workpath+"/out/"+str(k)+"star-motif.txt") as f:
     lines = f.readlines()
@@ -62,17 +62,17 @@ def scatter_plot(subs,ax,motifs,color='r',size=10,label='all areas'):
 
 
 #%% 
-fig = plt.figure(figsize=(30,30))
+fig = plt.figure(figsize=(25,25))
 ax = fig.add_subplot(111)
 
 scatter_plot(urban_sub,ax,kstar_motif,color='crimson',size=300,label='urban areas')
 scatter_plot(rural_sub,ax,kstar_motif,color='slateblue',size=300,label='rural areas')
 
-ax.set_xlabel("Size of network",fontsize=60)
-ax.set_ylabel("Number of motifs",fontsize=60)
-ax.set_title(str(k)+"-node star motifs",fontsize=60)
+ax.set_xlabel("Size of network",fontsize=70)
+ax.set_ylabel("Number of motifs",fontsize=70)
+ax.set_title(str(k)+"-node star motifs",fontsize=70)
 
-ax.legend(prop={'size': 50})
+ax.legend(prop={'size': 70})
 ax.tick_params(axis='both', labelsize=50)
 fig.savefig("{}{}.png".format(figpath,str(k)+'star-motif-comp'),bbox_inches='tight')
 
@@ -80,16 +80,16 @@ fig.savefig("{}{}.png".format(figpath,str(k)+'star-motif-comp'),bbox_inches='tig
 
 
 
-fig = plt.figure(figsize=(30,30))
+fig = plt.figure(figsize=(25,25))
 ax = fig.add_subplot(111)
 
 scatter_plot(urban_sub,ax,kpath_motif,color='crimson',size=300,label='urban areas')
 scatter_plot(rural_sub,ax,kpath_motif,color='slateblue',size=300,label='rural areas')
 
-ax.set_xlabel("Size of network",fontsize=60)
-ax.set_ylabel("Number of motifs",fontsize=60)
-ax.set_title(str(k)+"-node path motifs",fontsize=60)
+ax.set_xlabel("Size of network",fontsize=70)
+ax.set_ylabel("Number of motifs",fontsize=70)
+ax.set_title(str(k)+"-node path motifs",fontsize=70)
 
-ax.legend(prop={'size': 50})
+ax.legend(prop={'size': 70})
 ax.tick_params(axis='both', labelsize=50)
 fig.savefig("{}{}.png".format(figpath,str(k)+'path-motif-comp'),bbox_inches='tight')

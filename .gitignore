@@ -1,5 +1,8 @@
 updates
-primnet/out
+primnet/out/gurobi
+primnet/out/hop-reach-stat
+primnet/out/osm-prim-master
+primnet/out/osm-primnet
 secnet/out
 auxillary/out
 ensemble/out
