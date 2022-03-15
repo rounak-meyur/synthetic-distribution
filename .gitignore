@@ -5,6 +5,7 @@ primnet/out/osm-prim-master
 primnet/out/osm-primnet
 primnet/out/pv-pen
 primnet/out/prim-geom
+primnet/out/network-stats.txt
 secnet/out
 auxillary/out
 ensemble/out
