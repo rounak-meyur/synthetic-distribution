@@ -3,6 +3,8 @@ primnet/out/gurobi
 primnet/out/hop-reach-stat
 primnet/out/osm-prim-master
 primnet/out/osm-primnet
+primnet/out/pv-pen
+primnet/out/prim-geom
 secnet/out
 auxillary/out
 ensemble/out
