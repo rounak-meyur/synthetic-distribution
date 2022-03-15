@@ -278,7 +278,7 @@ def get_polygon(boundary):
     return np.array([vert1,vert2,vert3,vert4])
 
 
-def plot_deviation(ax,gridlist,C_masked,colormap=cm.BrBG):
+def plot_deviation(ax,gridlist,C_masked,colormap=cm.BrBG,vmin=-100.0,vmax=100.0):
     x_array = np.array(sorted(list(set([g.west_edge for g in gridlist]\
                                        +[g.east_edge for g in gridlist]))))
     y_array = np.array(sorted(list(set([g.south_edge for g in gridlist]\
@@ -295,7 +295,7 @@ def plot_deviation(ax,gridlist,C_masked,colormap=cm.BrBG):
     kx = len(y_array) - 1
     
     ax.pcolor(x_array,y_array,C_masked.reshape((kx,ky)).T,cmap=colormap,
-              edgecolor='black')
+              edgecolor='black',vmin=vmin,vmax=vmax)
     
     # Get the boxes for absent actual data
     verts_invalid = [get_polygon(bound) for i,bound in enumerate(gridlist) \

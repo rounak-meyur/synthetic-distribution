@@ -126,9 +126,9 @@ for area in area_data:
             weights=w_deg,label=labels,color=colors)
     ax.set_xticks(range(1,max_deg+1))
     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
-    ax.set_ylabel("Percentage of nodes",fontsize=60)
-    ax.set_xlabel("Degree of node",fontsize=60)
-    ax.legend(prop={'size': 60})
+    ax.set_ylabel("Percentage of nodes",fontsize=70)
+    ax.set_xlabel("Degree of node",fontsize=70)
+    ax.legend(fontsize=70,markerscale=3)
     ax.tick_params(axis='both', labelsize=60)
     
     # KL-divergence
@@ -145,9 +145,9 @@ for area in area_data:
     ax = fig.add_subplot(111)
     ax.hist(hop,weights=w_hop,label=labels,color=colors)
     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
-    ax.set_ylabel("Percentage of nodes",fontsize=60)
-    ax.set_xlabel("Hops from root node",fontsize=60)
-    ax.legend(prop={'size': 60})
+    ax.set_ylabel("Percentage of nodes",fontsize=70)
+    ax.set_xlabel("Hops from root node",fontsize=70)
+    ax.legend(fontsize=70,markerscale=3)
     ax.tick_params(axis='both', labelsize=60)
     
     # KL-divergence
@@ -164,9 +164,9 @@ for area in area_data:
     ax = fig.add_subplot(111)
     ax.hist(dist,weights=w_hop,label=labels,color=colors)
     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
-    ax.set_ylabel("Percentage of nodes",fontsize=60)
-    ax.set_xlabel("Distance from root node (in miles)",fontsize=60)
-    ax.legend(prop={'size': 60})
+    ax.set_ylabel("Percentage of nodes",fontsize=70)
+    ax.set_xlabel("Distance from root node (in miles)",fontsize=70)
+    ax.legend(fontsize=70,markerscale=3)
     ax.tick_params(axis='both', labelsize=60)
     
     # KL-divergence

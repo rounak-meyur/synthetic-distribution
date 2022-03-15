@@ -34,10 +34,13 @@ with open(inppath+"rural-sublist.txt") as f:
 rural_sub = [s for s in sublist if s in rural_sublist]
 urban_sub = [s for s in sublist if s in urban_sublist]
 
+c_urban = 'crimson'
+c_rural = 'slateblue'
+
 
 #%% Get motif data in rural and urban areas
 
-k = 5
+k = 4
 
 with open(workpath+"/out/"+str(k)+"star-motif.txt") as f:
     lines = f.readlines()
@@ -65,14 +68,14 @@ def scatter_plot(subs,ax,motifs,color='r',size=10,label='all areas'):
 fig = plt.figure(figsize=(25,25))
 ax = fig.add_subplot(111)
 
-scatter_plot(urban_sub,ax,kstar_motif,color='crimson',size=300,label='urban areas')
-scatter_plot(rural_sub,ax,kstar_motif,color='slateblue',size=300,label='rural areas')
+scatter_plot(urban_sub,ax,kstar_motif,color=c_urban,size=400,label='urban areas')
+scatter_plot(rural_sub,ax,kstar_motif,color=c_rural,size=400,label='rural areas')
 
 ax.set_xlabel("Size of network",fontsize=70)
 ax.set_ylabel("Number of motifs",fontsize=70)
 ax.set_title(str(k)+"-node star motifs",fontsize=70)
 
-ax.legend(prop={'size': 70})
+ax.legend(fontsize=70,markerscale=2.5)
 ax.tick_params(axis='both', labelsize=50)
 fig.savefig("{}{}.png".format(figpath,str(k)+'star-motif-comp'),bbox_inches='tight')
 
@@ -83,13 +86,13 @@ fig.savefig("{}{}.png".format(figpath,str(k)+'star-motif-comp'),bbox_inches='tig
 fig = plt.figure(figsize=(25,25))
 ax = fig.add_subplot(111)
 
-scatter_plot(urban_sub,ax,kpath_motif,color='crimson',size=300,label='urban areas')
-scatter_plot(rural_sub,ax,kpath_motif,color='slateblue',size=300,label='rural areas')
+scatter_plot(urban_sub,ax,kpath_motif,color=c_urban,size=400,label='urban areas')
+scatter_plot(rural_sub,ax,kpath_motif,color=c_rural,size=400,label='rural areas')
 
 ax.set_xlabel("Size of network",fontsize=70)
 ax.set_ylabel("Number of motifs",fontsize=70)
 ax.set_title(str(k)+"-node path motifs",fontsize=70)
 
-ax.legend(prop={'size': 70})
+ax.legend(fontsize=70,markerscale=2)
 ax.tick_params(axis='both', labelsize=50)
 fig.savefig("{}{}.png".format(figpath,str(k)+'path-motif-comp'),bbox_inches='tight')
