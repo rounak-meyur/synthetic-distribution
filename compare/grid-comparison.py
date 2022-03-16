@@ -99,9 +99,9 @@ leg_data = [Line2D([0], [0], color=c_actual, markerfacecolor=c_actual,
                          label='Grid cells with no actual network data')]
 
 #%% Hausdorff distance between networks
-kx = 10
-ky = 10
-x0 = 0
+kx = 7
+ky = 7
+x0 = 0.05
 y0 = 0
 
 LEFT,RIGHT,BOTTOM,TOP = get_limits(area_data)
@@ -133,20 +133,15 @@ cbar = fig.colorbar(cobj,ax=ax)
 cbar.set_label("Hausdorff distance (meters)",size=70)
 cbar.ax.tick_params(labelsize=60)
 
-
-fig.savefig("{}{}.png".format(figpath,'hauss-comparison-'+str(kx)+'-'+str(ky)),
+suffix = "-"+get_suffix(x0)+"-"+get_suffix(y0)
+fig.savefig("{}{}.png".format(figpath,'hauss-comparison-'+str(kx)+'-'+str(ky)+suffix),
         bbox_inches='tight')
 
-#%% Percentage spatial deviation of node distribution
-
-
-# for s in [-0.1,-0.05,0,0.05,0.1]:
-#     C = node_stats(area_data,7,7,x0=s)
-
+sys.exit(0)
 #%% Spatial Distribution of nodes
-kx = 10
-ky = 10
-x0 = 0
+kx = 7
+ky = 7
+x0 = -0.05
 y0 = 0
 
 # Get the limits and data
@@ -166,7 +161,7 @@ C = {bound:100.0*(1-((B[bound]/B_nodes)/(A[bound]/A_nodes))) \
 C_vals = np.array([C[bound] for bound in C])
 C_masked = np.ma.array(C_vals, mask=np.isnan(C_vals))
 
-#%% Generate the plot  
+# Generate the plot  
 fig = plt.figure(figsize=(30,25))
 ax = fig.add_subplot(1,1,1)
 
