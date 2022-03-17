@@ -252,35 +252,3 @@ while(count<num_nets):
         # nx.write_gpickle(new_network,
         #                  outpath+str(sub)+'-ensemble-'+str(count)+'.gpickle')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

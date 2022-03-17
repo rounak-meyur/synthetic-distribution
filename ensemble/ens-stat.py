@@ -4,10 +4,8 @@ Created on Tue Mar 30 21:05:36 2021
 
 @author: Rounak
 
-Description: This program analyses the impact of PV penetration in the synthetic
-distribution networks of Virginia.
-
-Expectations: Long feeders should have overvoltage based on literature (??)
+Description: This program plots the variation in degree, hop and reach distributions
+in the ensemble of networks. Networks belong to Montgomery county.
 """
 
 import sys,os

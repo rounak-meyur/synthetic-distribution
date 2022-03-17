@@ -2,7 +2,8 @@
 """
 Created on Thu Jan 14 21:16:52 2021
 
-@author: rouna
+@author: rounak
+Description: Compares network efficiency within the ensemble of networks.
 """
 
 import os,sys

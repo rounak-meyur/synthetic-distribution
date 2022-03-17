@@ -3,7 +3,8 @@
 Created on Wed Mar  3 11:43:38 2021
 
 @author: rounak
-Description: Compares between networks in an ensemble.
+Description: Compares between networks in an ensemble. Creates a gif out of the
+network structure variation
 """
 
 import sys,os
@@ -92,20 +93,5 @@ for i in range(1,21):
     tree = nx.read_gpickle(outpath+str(sub)+'-ensemble-'+str(i)+'.gpickle')
     plot_network(tree,with_secnet=True,path=tmppath+str(i),alpha=0.3)
 makegif(tmppath,figpath+str(sub)+"-ensemble")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

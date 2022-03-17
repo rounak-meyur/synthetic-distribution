@@ -170,31 +170,3 @@ ax.set_xlabel('Distance (in km) from root node',fontsize=20)
 ax.set_title("Reach distribution",fontsize=20)
 labels = ax.get_yticks()
 ax.set_yticklabels(["{:.1f}".format(100.0*i) for i in labels])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
