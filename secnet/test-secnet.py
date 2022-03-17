@@ -306,7 +306,7 @@ def display_link(link,homelist,roads,homes,forest,roots,path,name):
     return
 
 display_link(link,homelist,roads,homes,forest,roots,figpath,'secnet-link-home-tsfr')
-
+sys.exit(0)
 #%% Computational Time Stats
 
 import numpy as np

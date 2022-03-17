@@ -11,8 +11,9 @@ import matplotlib.pyplot as plt
 from scipy.stats import entropy
 import numpy as np
 import networkx as nx
-import collections
-
+import pandas as pd
+from matplotlib.patches import Patch
+import seaborn as sns
 
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
@@ -23,6 +24,7 @@ synpath = rootpath + "/primnet/out/osm-primnet/"
 
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet,get_areadata
+from pyResiliencelib import star,path
 print("Imported modules")
 
 colors = ['blue','orangered']
@@ -54,7 +56,76 @@ area_data = {area:get_areadata(actpath,area,root,synth_net) \
 print("Area Data extracted and stored")
 
 
-#%% Degree Distribution Comparison
+#%% Motif comparison
+
+def draw_bars(df,ax,title):
+    # Draw the bar plot
+    ax = sns.barplot(data=df, x="section",y="ratio",hue="group",
+                     palette=colors,ax=ax,edgecolor="k")
+    
+    
+    # Format other stuff
+    ax.tick_params(axis='y',labelsize=60)
+    ax.tick_params(axis='x',labelsize=60)
+    ax.set_ylabel("Ratio (Motif : Size)",fontsize=70)
+    ax.set_xlabel("Network Sections",fontsize=70)
+    ax.set_title(title,fontsize=70)
+    
+    
+    han = [Patch(facecolor=color, edgecolor='black', label=label) \
+                  for label, color in zip(labels, colors)]
+    ax.legend(handles=han,ncol=1,fontsize=60,loc='upper left')
+    return ax
+
+
+k = 4
+data_path = {'ratio':[],'section':[],'group':[]}
+data_star = {'ratio':[],'section':[],'group':[]}
+
+for i,area in enumerate(area_data):
+    # Get the data
+    synth = area_data[area]['synthetic']
+    act = area_data[area]['actual']
+    
+    # Compute motifs
+    path_act = path(act,k)/len(act)
+    star_act = star(act,k)/len(act)
+    path_synth = path(synth,k)/len(synth)
+    star_synth = star(synth,k)/len(synth)
+    
+    # Store the path motif counts
+    data_path['ratio'].append(path_act)
+    data_path['section'].append("Section "+str(i+1))
+    data_path['group'].append("Actual Network")
+    data_path['ratio'].append(path_synth)
+    data_path['section'].append("Section "+str(i+1))
+    data_path['group'].append("Synthetic Network")
+    
+    # Store the star motif counts
+    data_star['ratio'].append(star_act)
+    data_star['section'].append("Section "+str(i+1))
+    data_star['group'].append("Actual Network")
+    data_star['ratio'].append(star_synth)
+    data_star['section'].append("Section "+str(i+1))
+    data_star['group'].append("Synthetic Network")
+
+
+df_path = pd.DataFrame(data_path)
+df_star = pd.DataFrame(data_star)
+
+fig = plt.figure(figsize=(30,18))
+ax = fig.add_subplot(111)
+draw_bars(df_path,ax,str(k)+"-node path motif")
+fig.savefig("{}{}.png".format(figpath,str(k)+"-path-comp"),bbox_inches='tight')
+
+fig = plt.figure(figsize=(30,18))
+ax = fig.add_subplot(111)
+draw_bars(df_star,ax,str(k)+"-node star motif")
+fig.savefig("{}{}.png".format(figpath,str(k)+"-star-comp"),bbox_inches='tight')
+
+sys.exit(0)
+
+#%% Distribution Comparison
 for area in area_data:
     
     sub = area_data[area]['root']
