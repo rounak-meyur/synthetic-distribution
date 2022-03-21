@@ -60,8 +60,8 @@ closest_path = min(matches, key=lambda i: M.links[i][0].distance(residence))
 nearest = M.links[closest_path][-1]
 
 #%% Functions to plot mapping explanation
-font = 15
-mark = 10
+font = 45
+mark = 40
 
 def draw_base(ax,interest,color='black'):
     xcord = [interest.nodes[n]['x'] for n in interest]
@@ -78,7 +78,7 @@ def draw_base(ax,interest,color='black'):
          'geometry':[Point(interest.nodes[n]['x'],interest.nodes[n]['y']) \
                      for n in interest]}
     df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    df_nodes.plot(ax=ax,color="blue",markersize=50)
+    df_nodes.plot(ax=ax,color="blue",markersize=300)
     
     # Get the dataframe for edge geometries
     d = {'edges':[e for e in interest.edges(keys=True)],
@@ -87,7 +87,7 @@ def draw_base(ax,interest,color='black'):
     df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
     df_edges.plot(ax=ax,edgecolor=color,linewidth=3.0)
     
-    ax.scatter(homes.cord[h][0],homes.cord[h][1],marker='D',s=50,c='magenta')
+    ax.scatter(homes.cord[h][0],homes.cord[h][1],marker='D',s=300,c='crimson')
 
     ax.set_xlim(xmin,xmax)
     ax.set_ylim(ymin,ymax)
@@ -95,8 +95,8 @@ def draw_base(ax,interest,color='black'):
 
     # Update legends
     leglines = [Line2D([0], [0], color='black', markerfacecolor='blue', marker='o',
-                markersize=mark,linestyle='dashed'),
-                Line2D([0], [0], color='white', markerfacecolor='magenta', marker='D',
+                markersize=mark,linestyle='solid'),
+                Line2D([0], [0], color='white', markerfacecolor='crimson', marker='D',
                 markersize=mark)]
     labels = ['road links','residential building']
     return leglines,labels
@@ -148,43 +148,50 @@ def match_box(ax,lines,matches,leglines,labels):
     return leglines,labels
 
 
-#%% Plot the steps of mapping residence to nearest link
-fig = plt.figure(figsize=(16,10))
+# Plot the steps of mapping residence to nearest link
 
-ax1 = fig.add_subplot(221)
+
+
+fig1 = plt.figure(figsize=(20,20))
+ax1 = fig1.add_subplot(111)
 leglines,labels = draw_base(ax1,interest)
 ax1.set_title("Get all road links and point of interest",fontsize=font)
-ax1.legend(leglines,labels,loc='best',ncol=1,prop={'size': mark})
+ax1.legend(leglines,labels,loc='lower left',ncol=1,prop={'size': mark})
+fig1.savefig("{}{}.png".format(figpath,'step1'),bbox_inches='tight')
 
-ax2 = fig.add_subplot(222)
+fig2 = plt.figure(figsize=(20,20))
+ax2 = fig2.add_subplot(111)
 leglines,labels = draw_base(ax2,interest)
 leglines,labels = link_box(ax2,links,leglines,labels)
 leglines,labels = pt_box(ax2,residence,leglines,labels)
 ax2.set_title("Draw bounding boxes around each link and the point",fontsize=font)
-ax2.legend(leglines,labels,loc='best',ncol=2,prop={'size': mark})
+ax2.legend(leglines,labels,loc='lower left',ncol=1,prop={'size': mark})
+fig2.savefig("{}{}.png".format(figpath,'step2'),bbox_inches='tight')
 
-ax3 = fig.add_subplot(223)
+fig3 = plt.figure(figsize=(20,20))
+ax3 = fig3.add_subplot(111)
 color = ['seagreen' if e in match_link or (e[1],e[0],e[2]) in match_link else 'black' \
          for e in list(interest.edges(keys=True))]
 leglines,labels = draw_base(ax3,interest,color)
 leglines,labels = pt_box(ax3,residence,leglines,labels)
 leglines,labels = match_box(ax3,links,matches,leglines,labels)
 ax3.set_title("Short-list links with intersecting bounding box",fontsize=font)
-ax3.legend(leglines,labels,loc='best',ncol=1,prop={'size': mark})
+ax3.legend(leglines,labels,loc='lower left',ncol=1,prop={'size': mark})
+fig3.savefig("{}{}.png".format(figpath,'step3'),bbox_inches='tight')
 
-ax4 = fig.add_subplot(224)
-color = ['magenta' if e == nearest or (e[1],e[0],e[2]) == nearest else 'black' \
+fig4 = plt.figure(figsize=(20,20))
+ax4 = fig4.add_subplot(111)
+color = ['crimson' if e == nearest or (e[1],e[0],e[2]) == nearest else 'black' \
          for e in list(interest.edges(keys=True))]
 leglines,labels = draw_base(ax4,interest,color)
-leglines += [Line2D([0], [0], color='magenta', markerfacecolor='blue', marker='o',
+leglines += [Line2D([0], [0], color='crimson', markerfacecolor='blue', marker='o',
                   markersize=0)]
 labels += ["nearest road link"]
 ax4.set_title("Find the nearest among short-listed links",fontsize=font)
-ax4.legend(leglines,labels,loc='best',ncol=1,prop={'size': mark})
+ax4.legend(leglines,labels,loc='lower left',ncol=1,prop={'size': mark})
+fig4.savefig("{}{}.png".format(figpath,'step4'),bbox_inches='tight')
 
-fig.savefig("{}{}.png".format(figpath,'mapping-steps'),bbox_inches='tight')
-
-
+sys.exit(0)
 #%% Secondary Network Creation
 from pyBuildSecNetlib import generate_optimal_topology as generate
 

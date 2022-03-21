@@ -24,6 +24,29 @@ print("Imported modules")
 
 
 sublist = [int(x.strip("-dist-net.gpickle")) for x in os.listdir(distpath)]
+
+s_edges = 0
+p_edges = 0
+h_edges = 0
+h_nodes = 0
+t_nodes = 0
+r_nodes = 0
+s_nodes = 0
+for i,sub in enumerate(sublist):
+    dist = GetDistNet(distpath,sub)
+    s_edges += len([e for e in dist.edges if dist.edges[e]['label']=='S'])
+    p_edges += len([e for e in dist.edges if dist.edges[e]['label']=='P'])
+    h_edges += len([e for e in dist.edges if dist.edges[e]['label']=='E'])
+    
+    h_nodes += len([n for n in dist if dist.nodes[n]['label']=='H'])
+    t_nodes += len([n for n in dist if dist.nodes[n]['label']=='T'])
+    r_nodes += len([n for n in dist if dist.nodes[n]['label']=='R'])
+    s_nodes += len([n for n in dist if dist.nodes[n]['label']=='S'])
+    
+    print("Done",i+1,"out of",len(sublist))
+
+
+sys.exit(0)
 k = 5
 
 #%% k-path motif
