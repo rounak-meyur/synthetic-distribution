@@ -33,7 +33,6 @@ def create_shapefile(sub,path):
     d = {'node':[n for n in nodelist],
         'label':[net.nodes[n]['label'] for n in nodelist],
          'load':[net.nodes[n]['load'] for n in nodelist],
-         'voltage':[net.nodes[n]['voltage'] for n in nodelist],
          'geometry':[Point(net.nodes[n]['cord']) for n in nodelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
     gdf.to_file(path+str(sub)+"-nodelist.zip",driver='ESRI Shapefile')
@@ -45,16 +44,20 @@ def create_shapefile(sub,path):
          'line_type':[net.edges[e]['type'] for e in edgelist],
          'r':[net.edges[e]['r'] for e in edgelist],
          'x':[net.edges[e]['x'] for e in edgelist],
-         'length':[net.edges[e]['geo_length'] for e in edgelist],
-         'flow':[net.edges[e]['flow'] for e in edgelist],
+         'length':[net.edges[e]['length'] for e in edgelist],
          'geometry':[net.edges[e]['geometry'] for e in edgelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
     gdf.to_file(path+str(sub)+"-edgelist.zip",driver='ESRI Shapefile')
     return
 
 #%%
-f_done = [int(f.strip('-prim-dist.gpickle')) for f in os.listdir(distpath)]
-for s in f_done:
+# f_done = [int(f.strip('-prim-dist.gpickle')) for f in os.listdir(distpath)]
+
+sublist = [121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
+       150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
+       150727, 150728]
+
+for s in sublist:
     create_shapefile(s,shappath)
     print("Network created for",s)
 
