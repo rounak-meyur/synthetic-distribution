@@ -12,6 +12,10 @@ import sys,os
 import geopandas as gpd
 from shapely.geometry import Point
 
+import shutil
+import tempfile
+from pathlib import Path
+
 workpath = os.getcwd()
 rootpath = os.path.dirname(workpath)
 libpath = rootpath + "/libs/"
@@ -27,6 +31,17 @@ from pyExtractDatalib import GetDistNet
 print("Imported modules")
 
 #%% Load a network and save as shape file
+def get_zipped(gdf,filename):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        localFile = filename
+        
+        gdf.to_file(filename=temp_dir, driver='ESRI Shapefile')
+        
+        archiveFile = shutil.make_archive(localFile, 'zip', temp_dir)
+        shutil.rmtree(temp_dir)
+    return
+
 def create_shapefile(sub,path):
     net = GetDistNet(distpath,sub)
     nodelist = net.nodes
@@ -35,7 +50,7 @@ def create_shapefile(sub,path):
          'load':[net.nodes[n]['load'] for n in nodelist],
          'geometry':[Point(net.nodes[n]['cord']) for n in nodelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    gdf.to_file(path+str(sub)+"-nodelist.zip",driver='ESRI Shapefile')
+    get_zipped(gdf,path+str(sub)+"-nodelist")
     
     edgelist = net.edges
     d = {'label':[net.edges[e]['label'] for e in edgelist],
@@ -47,7 +62,7 @@ def create_shapefile(sub,path):
          'length':[net.edges[e]['length'] for e in edgelist],
          'geometry':[net.edges[e]['geometry'] for e in edgelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    gdf.to_file(path+str(sub)+"-edgelist.zip",driver='ESRI Shapefile')
+    get_zipped(gdf,path+str(sub)+"-edgelist")
     return
 
 #%%
