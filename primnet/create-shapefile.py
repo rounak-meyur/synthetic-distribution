@@ -11,6 +11,7 @@ stores information as a shape file for edgelist and nodelist
 import sys,os
 import geopandas as gpd
 from shapely.geometry import Point
+import networkx as nx
 
 import shutil
 import tempfile
@@ -23,14 +24,19 @@ inppath = rootpath + "/input/"
 figpath = workpath + "/figs/"
 distpath = workpath + "/out/osm-primnet/"
 shappath = rootpath + "/output/optimal/"
-
+enspath = rootpath + "/ensemble/out/osm-ensemble/"
+eshappath = rootpath + "/output/ensemble/"
 
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet
+from pyMiscUtilslib import assign_linetype
 
 print("Imported modules")
 
 #%% Load a network and save as shape file
+def GetEnsNet(path,sub,i):
+    return nx.read_gpickle(path+str(sub)+'-ensemble-'+str(i+1)+'.gpickle')
+
 def get_zipped(gdf,filename):
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir = Path(temp_dir)
@@ -42,15 +48,15 @@ def get_zipped(gdf,filename):
         shutil.rmtree(temp_dir)
     return
 
-def create_shapefile(sub,path):
-    net = GetDistNet(distpath,sub)
+def create_shapefile(sub,src,dest):
+    net = GetDistNet(src,sub)
     nodelist = net.nodes
     d = {'node':[n for n in nodelist],
         'label':[net.nodes[n]['label'] for n in nodelist],
          'load':[net.nodes[n]['load'] for n in nodelist],
          'geometry':[Point(net.nodes[n]['cord']) for n in nodelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    get_zipped(gdf,path+str(sub)+"-nodelist")
+    get_zipped(gdf,dest+str(sub)+"-nodelist")
     
     edgelist = net.edges
     d = {'label':[net.edges[e]['label'] for e in edgelist],
@@ -62,7 +68,32 @@ def create_shapefile(sub,path):
          'length':[net.edges[e]['length'] for e in edgelist],
          'geometry':[net.edges[e]['geometry'] for e in edgelist]}
     gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
-    get_zipped(gdf,path+str(sub)+"-edgelist")
+    get_zipped(gdf,dest+str(sub)+"-edgelist")
+    return
+
+
+def create_ens_shapefile(sub,src,i,dest):
+    net = GetEnsNet(src,sub,i)
+    assign_linetype(net)
+    nodelist = net.nodes
+    d = {'node':[n for n in nodelist],
+        'label':[net.nodes[n]['label'] for n in nodelist],
+         'load':[net.nodes[n]['load'] for n in nodelist],
+         'geometry':[Point(net.nodes[n]['cord']) for n in nodelist]}
+    gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    get_zipped(gdf,dest+str(sub)+"-nodelist-"+str(i+1))
+    
+    edgelist = net.edges
+    d = {'label':[net.edges[e]['label'] for e in edgelist],
+         'nodeA':[e[0] for e in edgelist],
+         'nodeB':[e[1] for e in edgelist],
+         'line_type':[net.edges[e]['type'] for e in edgelist],
+         'r':[net.edges[e]['r'] for e in edgelist],
+         'x':[net.edges[e]['x'] for e in edgelist],
+         'length':[net.edges[e]['geo_length'] for e in edgelist],
+         'geometry':[net.edges[e]['geometry'] for e in edgelist]}
+    gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    get_zipped(gdf,dest+str(sub)+"-edgelist-"+str(i+1))
     return
 
 #%%
@@ -73,9 +104,13 @@ sublist = [121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
        150727, 150728]
 
 for s in sublist:
-    create_shapefile(s,shappath)
+    create_shapefile(s,distpath,shappath)
     print("Network created for",s)
 
 
-
+#%% Ensemble of networks
+for s in sublist:
+    for i in range(20):
+        create_ens_shapefile(s,enspath,i,eshappath)
+        print("Network "+str(i+1)+" created for "+str(s))
 
