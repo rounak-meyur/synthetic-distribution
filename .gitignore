@@ -4,12 +4,12 @@ primnet/out/hop-reach-stat
 primnet/out/osm-prim-master
 primnet/out/osm-primnet
 primnet/out/pv-pen
-primnet/out/prim-geom
 primnet/out/network-stats.txt
 secnet/out
+input/census
+input/eia
 auxillary/out
 ensemble/out
-input
 libs/__pycache__
 secnet/.ipynb_checkpoints
 primnet/.ipynb_checkpoints

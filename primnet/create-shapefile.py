@@ -22,7 +22,7 @@ libpath = rootpath + "/libs/"
 inppath = rootpath + "/input/"
 figpath = workpath + "/figs/"
 distpath = workpath + "/out/osm-primnet/"
-shappath = workpath + "/out/prim-geom/"
+shappath = rootpath + "/output/optimal/"
 
 
 sys.path.append(libpath)
