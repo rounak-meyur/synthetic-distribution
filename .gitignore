@@ -6,8 +6,7 @@ primnet/out/osm-primnet
 primnet/out/pv-pen
 primnet/out/network-stats.txt
 secnet/out
-input/census
-input/eia
+input
 auxillary/out
 ensemble/out
 libs/__pycache__
