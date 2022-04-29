@@ -13,7 +13,6 @@ import networkx as nx
 import numpy as np
 from math import log,exp
 from pyGeometrylib import Link
-import gurobipy as grb
 from pyExtractDatalib import GetSecnet,GetHomes
 
 
@@ -217,21 +216,19 @@ def assign_linetype(graph):
 
 
 #%% Creating variant networks
-def create_variant_network(graph,road,new_prim,rem_edges):
+def create_variant_network(net,road,prim_edges):
     """
     Alters the input network to create a variant version of it. It is used to
     create variant networks in the ensemble of networks
 
     Parameters
     ----------
-    graph : networkx graph
+    old_net : networkx graph
         input distribution network.
     road : networkx graph
         underlying road network.
-    new_prim : list of edge tuples
+    prim_edges : list of edge tuples
         list of primary network edges in the new network.
-    rem_edges : list of edge tuples
-        list of primary network edges in the old network which are to be removed.
 
     Returns
     -------
@@ -239,239 +236,51 @@ def create_variant_network(graph,road,new_prim,rem_edges):
     Essentially returns the altered graph.
 
     """
-    new_edges = [e for e in new_prim if e not in graph.edges]
-    nodelist = list(graph.nodes)
-    for e in rem_edges:
-        graph.remove_edge(*e)
-    graph.add_edges_from(new_edges)
+    # Get node and edge list with attributes
+    sec_edges = [e for e in net.edges if net.edges[e]['label']=='S']
+    hv_edges = [e for e in net.edges if net.edges[e]['label']=='E']
     
-    # node attributes
-    for n in graph:
-        if n not in nodelist:
-            graph.nodes[n]['cord'] = road.nodes[n]['cord']
-            graph.nodes[n]['load'] = 0.0
-            graph.nodes[n]['label'] = 'R'
+    # Construct the variant network
+    variant = nx.Graph()
+    variant.add_edges_from(sec_edges+hv_edges+prim_edges)
     
-    # edge attributes
-    for e in new_edges:
-        graph.edges[e]['geometry'] = LineString((graph.nodes[e[0]]['cord'],
-                                                 graph.nodes[e[1]]['cord']))
-        graph.edges[e]['geo_length'] = Link(graph.edges[e]['geometry']).geod_length
-        graph.edges[e]['label'] = 'P'
-        length = graph.edges[e]['geo_length'] if graph.edges[e]['geo_length'] != 0.0 else 1e-12
-        graph.edges[e]['r'] = 0.8625/39690 * length
-        graph.edges[e]['x'] = 0.4154/39690 * length
+    # Add node attributes
+    for n in variant:
+        if n in net:
+            variant.nodes[n]['cord'] = net.nodes[n]['cord']
+            variant.nodes[n]['load'] = net.nodes[n]['load']
+            variant.nodes[n]['label'] = net.nodes[n]['label']
+        elif n in road:
+            variant.nodes[n]['cord'] = road.nodes[n]['cord']
+            variant.nodes[n]['load'] = road.nodes[n]['load']
+            variant.nodes[n]['label'] = road.nodes[n]['label']
+        else:
+            print("Warning!!! Unknown node information")
+    for e in variant.edges:
+        # Edge geometry and length
+        variant.edges[e]['geometry'] = LineString((variant.nodes[e[0]]['cord'],
+                                                 variant.nodes[e[1]]['cord']))
+        variant.edges[e]['length'] = Link(variant.edges[e]['geometry']).geod_length
+        length = variant.edges[e]['length']
+        # Edge labels
+        if (e in sec_edges) or ((e[1],e[0]) in sec_edges):
+            variant.edges[e]['label'] = 'S'
+            variant.edges[e]['r'] = (0.082/57.6) * length*1e-3
+            variant.edges[e]['x'] = (0.027/57.6) * length*1e-3
+        elif (e in prim_edges) or ((e[1],e[0]) in prim_edges):
+            variant.edges[e]['label'] = 'P'
+            variant.edges[e]['r'] = (0.0822/39690)*length*1e-3
+            variant.edges[e]['x'] = (0.0964/39690)*length*1e-3
+        elif (e in hv_edges) or ((e[1],e[0]) in hv_edges):
+            variant.edges[e]['label'] = 'E'
+            variant.edges[e]['r'] = (0.0822/363000)*length*1e-3
+            variant.edges[e]['x'] = (0.0964/363000)*length*1e-3
+        else:
+            print("Warning!!! Unknown edge information")
     
     # Run powerflow
-    powerflow(graph)
-    assign_linetype(graph)
-    return
+    powerflow(variant)
+    assign_linetype(variant)
+    return variant
 
 
-#%% Restricted MILP for variant networks
-def mycallback(model, where):
-    if where == grb.GRB.Callback.MIP:
-        # General MIP callback
-        objbst = model.cbGet(grb.GRB.Callback.MIP_OBJBST)
-        objbnd = model.cbGet(grb.GRB.Callback.MIP_OBJBND)
-        time = model.cbGet(grb.GRB.Callback.RUNTIME)
-        if(time>60 and abs(objbst - objbnd) < 0.0025 * (1.0 + abs(objbst))):
-            print('Stop early - 0.25% gap achieved time exceeds 1 minute')
-            model.terminate()
-        elif(time>300 and abs(objbst - objbnd) < 0.01 * (1.0 + abs(objbst))):
-            print('Stop early - 1.00% gap achieved time exceeds 5 minutes')
-            model.terminate()
-        elif(time>480 and abs(objbst - objbnd) < 0.05 * (1.0 + abs(objbst))):
-            print('Stop early - 5.00% gap achieved time exceeds 8 minutes')
-            model.terminate()
-        elif(time>600 and objbst < grb.GRB.INFINITY):
-            print('Stop early - feasible solution found time exceeds 10 minutes')
-            model.terminate()
-        elif(time>600 and objbst == grb.GRB.INFINITY):
-            print('Stop early - no solution found in 10 minutes')
-            model.terminate()
-    return
-
-class reduced_MILP_primary:
-    """
-    Contains methods and attributes to generate the optimal primary distribution
-    network for covering a given set of local transformers through the edges of
-    an existing road network.
-    """
-    def __init__(self,road,grbpath=None):
-        """
-        """
-        # Get tmp path for gurobi log files
-        self.tmp = grbpath+"gurobi/"
-        
-        # Get data from graph
-        self.edges = list(road.edges())
-        self.nodes = list(road.nodes())
-        
-        self.tindex = [i for i,n in enumerate(self.nodes) if road.nodes[n]['label']=='T']
-        self.rindex = [i for i,n in enumerate(self.nodes) if road.nodes[n]['label']=='R']
-        
-        # Vectorize the data for matrix computation
-        self.A = nx.incidence_matrix(road,nodelist=self.nodes,
-                                     edgelist=self.edges,oriented=True)
-        self.I = nx.incidence_matrix(road,nodelist=self.nodes,
-                                     edgelist=self.edges,oriented=False)
-        self.c = [1e-3*road.edges[self.edges[i]]['length'] \
-                  for i in range(len(self.edges))]
-        self.p = np.array([1e-3*road.nodes[self.nodes[i]]['load'] for i in self.tindex])
-        
-        
-        # Create the optimization model
-        self.model = grb.Model(name="Get Variant Primary Network")
-        self.model.ModelSense = grb.GRB.MINIMIZE
-        self.variables()
-        self.masterTree()
-        self.power_flow()
-        self.radiality()
-        self.flowconstraint(M=1000)
-        self.connectivity()
-        self.objective()
-        self.model.write(self.tmp+"variant.lp")
-        return
-        
-    
-    def variables(self):
-        """
-        """
-        print("Setting up variables")
-        self.x = self.model.addMVar(len(self.edges),
-                                    vtype=grb.GRB.BINARY,name='x')
-        self.y = self.model.addMVar(len(self.rindex),
-                                    vtype=grb.GRB.BINARY,name='y')
-        self.z = self.model.addMVar(len(self.rindex),
-                                    vtype=grb.GRB.BINARY,name='z')
-        self.f = self.model.addMVar(len(self.edges),
-                                    vtype=grb.GRB.CONTINUOUS,
-                                    lb=-grb.GRB.INFINITY,name='f')
-        self.v = self.model.addMVar(len(self.nodes),
-                                    vtype=grb.GRB.CONTINUOUS,
-                                    lb=0.9,ub=1.0,name='v')
-        self.t = self.model.addMVar(len(self.edges),
-                                    vtype=grb.GRB.BINARY,name='t')
-        self.g = self.model.addMVar(len(self.edges),
-                                    vtype=grb.GRB.CONTINUOUS,
-                                    lb=-grb.GRB.INFINITY,name='g')
-        self.model.update()
-        return
-    
-    def power_flow(self,r=0.8625/39690,M=0.15):
-        """
-        """
-        print("Setting up power flow constraints")
-        expr = r*np.diag(self.c)@self.f
-        self.model.addConstr(self.A.T@self.v - expr - M*(1-self.x) <= 0)
-        self.model.addConstr(self.A.T@self.v - expr + M*(1-self.x) >= 0)
-        self.model.addConstr(1-self.v[self.rindex] <= self.z)
-        self.model.update()
-        return
-    
-    def radiality(self):
-        """
-        """
-        print("Setting up radiality constraints")
-        self.model.addConstr(
-                self.x.sum() == len(self.nodes) - 2*len(self.rindex) + \
-                self.y.sum()+self.z.sum())
-        self.model.update()
-        return
-    
-    def connectivity(self):
-        """
-        """
-        print("Setting up connectivity constraints")
-        self.model.addConstr(
-                self.I[self.rindex,:]@self.x <= len(self.edges)*self.y)
-        self.model.addConstr(
-                self.I[self.rindex,:]@self.x >= 2*(self.y+self.z-1))
-        self.model.addConstr(1-self.z <= self.y)
-        self.model.update()
-        return
-    
-    def flowconstraint(self,M=400):
-        """
-        """
-        print("Setting up capacity constraints for road nodes")
-        self.model.addConstr(self.A[self.rindex,:]@self.f - M*(1-self.z) <= 0)
-        self.model.addConstr(self.A[self.rindex,:]@self.f + M*(1-self.z) >= 0)
-        
-        print("Setting up flow constraints for transformer nodes")
-        self.model.addConstr(self.A[self.tindex,:]@self.f == -self.p)
-        
-        print("Setting up flow constraints")
-        self.model.addConstr(self.f - M*self.x <= 0)
-        self.model.addConstr(self.f + M*self.x >= 0)
-        self.model.update()
-        return
-    
-    def masterTree(self):
-        """
-        """
-        print("Setting up imaginary constraints for master solution")
-        M = len(self.nodes)
-        self.model.addConstr(self.A[1:,:]@self.g == -np.ones(shape=(M-1,)))
-        self.model.addConstr(self.g - M*self.t <= 0)
-        self.model.addConstr(self.g + M*self.t >= 0)
-        self.model.addConstr(self.x <= self.t)
-        self.model.update()
-        return
-    
-    def restrict(self,sub,net,rem_edges):
-        reg_nodes = list(nx.neighbors(net,sub))
-        for i,e in enumerate(self.edges):
-            if e in rem_edges or (e[1],e[0]) in rem_edges:
-                self.model.addConstr(self.x[i] == 0)
-                print(i)
-            elif e in net.edges: 
-                self.model.addConstr(self.x[i] == 1)
-            
-        for i,n in enumerate(self.rindex):
-            if self.nodes[n] in net: 
-                self.model.addConstr(self.y[i] == 1)
-            if self.nodes[n] in reg_nodes:
-                self.model.addConstr(self.z[i] == 0)
-            else:
-                self.model.addConstr(self.z[i] == 1)
-        return
-        
-    def objective(self):
-        """
-        """
-        print("Setting up objective function")
-        self.model.setObjective(np.array(self.c)@self.x)
-        return
-    
-    def solve(self):
-        """
-        """
-        # Turn off display and heuristics
-        grb.setParam('OutputFlag', 0)
-        grb.setParam('Heuristics', 0)
-        
-        # Open log file
-        logfile = open(self.tmp+'var_gurobi.log', 'w')
-        
-        # Pass data into my callback function
-        self.model._lastiter = -grb.GRB.INFINITY
-        self.model._lastnode = -grb.GRB.INFINITY
-        self.model._logfile = logfile
-        self.model._vars = self.model.getVars()
-        
-        # Solve model and capture solution information
-        self.model.optimize(mycallback)
-        
-        # Close log file
-        logfile.close()
-        print('')
-        print('Optimization complete')
-        if self.model.SolCount == 0:
-            print('No solution found, optimization status = %d' % self.model.Status)
-            return []
-        else:
-            print('Solution found, objective = %g' % self.model.ObjVal)
-            x_optimal = self.x.getAttr("x").tolist()
-            return [e for i,e in enumerate(self.edges) if x_optimal[i]>0.8]

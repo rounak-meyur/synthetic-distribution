@@ -10,7 +10,7 @@ import networkx as nx
 import gurobipy as grb
 import numpy as np
 from pyGeometrylib import Link
-from pyExtractDatalib import GetPrimRoad
+from pyExtractDatalib import GetMaster
 from pyMiscUtilslib import get_secnet
 
 
@@ -282,7 +282,7 @@ class Primary:
         self.graph = nx.Graph()
         
         # Update master graph with substation distance data
-        master = GetPrimRoad(path,str(subdata["id"]))
+        master = GetMaster(path,str(subdata["id"]))
         self.hvpath = update_data(master,subdata)
         print("Road distance updated")
         

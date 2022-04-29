@@ -27,11 +27,12 @@ sys.path.append(libpath)
 
 from pyGeometrylib import Link
 from pyExtractDatalib import GetDistNet,GetPrimRoad
-from pyMiscUtilslib import get_load, create_variant_network, reduced_MILP_primary
+from pyMiscUtilslib import get_load, create_variant_network
+from pyEnsemblelib import reduced_MILP_primary
 
 
 #%% Load the network data
-sub = 121143
+sub = 121144
 synth_net = GetDistNet(distpath,sub)
 road_net = GetPrimRoad(tsfrpath,sub)
 load = get_load(synth_net)

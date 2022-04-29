@@ -417,7 +417,7 @@ def GetSecnet(path,fis):
     return secnet
 
 #%% Get road and transformer network (output of Step 1)
-def GetPrimRoad(path,code):
+def GetMaster(path,code):
     """
     Extracts the road network with local transformer nodes.
     
@@ -440,6 +440,38 @@ def GetPrimRoad(path,code):
             graph = nx.compose(graph,g)
     else:
         graph = nx.read_gpickle(path+str(code)+'-master.gpickle')
+    return graph
+
+
+def GetPrimRoad(path,code):
+    """
+    Extracts the road network with local transformer nodes.
+    
+    Inputs:
+        path: name of the directory
+        code: substation ID or list of substation IDs
+        
+    Output:
+        graph: networkx graph
+        node attributes of graph:
+            cord: longitude,latitude information of each node
+            label: 'T' for transformer, 'R' for road node
+        edge attributes of graph:
+            None
+    """
+    if type(code) == list:
+        graph = nx.Graph()
+        for c in code:
+            g = nx.read_gpickle(path+str(c)+'-road.gpickle')
+            graph = nx.compose(graph,g)
+    else:
+        graph = nx.read_gpickle(path+str(code)+'-road.gpickle')
+    
+    # Add edge attributes for geometry
+    for e in graph.edges:
+        graph.edges[e]['geometry'] = LineString((graph.nodes[e[0]]['cord'],
+                                                 graph.nodes[e[1]]['cord']))
+        graph.edges[e]['length'] = Link(graph.edges[e]['geometry']).geod_length
     return graph
 
 #%% Get output synthetic networks (output of Step 2)

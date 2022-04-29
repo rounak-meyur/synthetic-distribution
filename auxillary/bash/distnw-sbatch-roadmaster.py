@@ -8,47 +8,64 @@ are distributed among the substations.
 """
 
 import sys,os
+import networkx as nx
 workPath = os.getcwd()
 libPath = workPath + "/Libraries/"
 sys.path.append(libPath)
-from pyExtractDatalib import GetPrimRoad
-from pyDrawNetworklib import plot_road_network
 
 
 
 # Load scratchpath
 scratchPath = "/sfs/lustre/bahamut/scratch/rm5nz/synthetic-distribution"
-# scratchPath = workPath
 inpPath = scratchPath + "/input/"
 figPath = scratchPath + "/figs/"
 tmpPath = scratchPath + "/temp/"
+roadpath = tmpPath + "osm-prim-road/"
+
+
+
+# mastpath = tmpPath + "osm-prim-master/"
+# filelist = os.listdir(mastpath)
+# for f in filelist:
+#     master_net = nx.read_gpickle(mastpath+f)
+#     road = master_net.__class__()
+#     road.add_edges_from(master_net.edges)
+#     for n in road.nodes:
+#         road.nodes[n]['cord'] = master_net.nodes[n]['cord']
+#         road.nodes[n]['label'] = master_net.nodes[n]['label']
+#         road.nodes[n]['load'] = master_net.nodes[n]['load']
+    
+#     sub = f.strip('-master.gpickle')
+#     nx.write_gpickle(road,roadpath+sub+'-road.gpickle')
+
+# sys.exit(0)
 
 sublist = [121143, 121144, 147793, 148717, 148718, 148719, 148720, 148721, 148723,
        150353, 150589, 150638, 150692, 150722, 150723, 150724, 150725, 150726, 
        150727, 150728]
 
+from pyExtractDatalib import GetPrimRoad
+from pyDrawNetworklib import plot_road_network
 
-
-# Extract all substations in the region
-with open(tmpPath+"subdata.txt") as f:
-    lines = f.readlines()
-
-data = [temp.strip('\n').split('\t') for temp in lines]
-subs = {int(d[0]):{"id":int(d[0]),"near":int(d[1]),
-                    "cord":[float(d[2]),float(d[3])]} for d in data}
-
-
-subdata = {s:subs[s] for s in sublist}
-roadpath = tmpPath + "osm-prim-master/"
 roadnet = GetPrimRoad(roadpath,sublist)
+
+
+
 small_road_net1 = GetPrimRoad(roadpath,121143)
 small_road_net2 = GetPrimRoad(roadpath,147793)
-
 dict_inset = {121143:{'graph':small_road_net1,'loc':2,
                       'loc1':1,'loc2':3,'zoom':1.5},
               147793:{'graph':small_road_net2,'loc':3,
                       'loc1':1,'loc2':4,'zoom':1.1}}
 
+
+# Extract all substations in the region
+with open(tmpPath+"subdata.txt") as f:
+    lines = f.readlines()
+data = [temp.strip('\n').split('\t') for temp in lines]
+subs = {int(d[0]):{"id":int(d[0]),"near":int(d[1]),
+                    "cord":[float(d[2]),float(d[3])]} for d in data}
+subdata = {s:subs[s] for s in sublist}
 plot_road_network(roadnet,subdata,inset=dict_inset,path=figPath+"all")
 
 # with open(inpPath+'sublist.txt') as f:
