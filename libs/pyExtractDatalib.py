@@ -509,6 +509,42 @@ def GetDistNet(path,code):
         graph = nx.read_gpickle(path+str(code)+'-dist-net.gpickle')
     return graph
 
+def Get3PhaseNet(path,code):
+    """
+    Read the txt file containing the edgelist of the generated synthetic network and
+    generates the corresponding networkx graph. The graph has the necessary node and
+    edge attributes.
+    
+    Inputs:
+        path: name of the directory
+        code: substation ID or list of substation IDs
+        
+    Output:
+        graph: networkx graph
+        node attributes of graph:
+            cord: longitude,latitude information of each node
+            label: 'H' for home, 'T' for transformer, 'R' for road node, 
+                    'S' for subs
+            voltage: node voltage in pu
+            phase: phase of node
+        edge attributes of graph:
+            label: 'P' for primary, 'S' for secondary, 'E' for feeder lines
+            r: resistance of edge
+            x: reactance of edge
+            geometry: shapely geometry of edge
+            geo_length: length of edge in meters
+            flow: power flowing in kVA through edge
+            phase: phase of line
+    """
+    if type(code) == list:
+        graph = nx.Graph()
+        for c in code:
+            g = nx.read_gpickle(path+str(c)+'-3phase-net.gpickle')
+            graph = nx.compose(graph,g)
+    else:
+        graph = nx.read_gpickle(path+str(code)+'-3phase-net.gpickle')
+    return graph
+
 #%% Actual Network and Synthetic Network data
 def get_geometry(path,area):
     """
