@@ -1,0 +1,8 @@
+
+
+New LineGeometry.3PH_HORIZ_LG_1C-AL_4/0_7STRAL_4/0_7STRAL_4/0_7STRACSR_1/0_6/1  nconds=4  nphases=3
+~ cond=1  wire=AL_4/0_7STR x=-1.39598 h=12.192 units=m
+~ cond=2  wire=AL_4/0_7STR x=0 h=12.192 units=m
+~ cond=3  wire=AL_4/0_7STR x=1.39598 h=12.192 units=m
+~ cond=4  wire=ACSR_1/0_6/1 x=0 h=10.9728 units=m
+~ reduce=y
