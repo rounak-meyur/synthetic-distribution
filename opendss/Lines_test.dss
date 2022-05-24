@@ -1,0 +1,13 @@
+New	Line.0_1_OH	Bus1=0.1.2.3	Bus2=1.1.2.3	Geometry=feeder	Phases=3	Length=32.8084	Units=ft
+New	Line.0_2_OH	Bus1=0.1.2.3	Bus2=2.1.2.3	Geometry=feeder	Phases=3	Length=32.8084	Units=ft
+New	Line.1_3_OH	Bus1=1.1.2.3	Bus2=3.1.2.3	Geometry=primary	Phases=3	Length=32.8084	Units=ft
+New	Line.2_4_OH	Bus1=2.1.2.3	Bus2=4.1.2.3	Geometry=primary	Phases=3	Length=32.8084	Units=ft
+New	Line.3_5_OH	Bus1=3.1.2.3	Bus2=5.1.2.3	Geometry=primary	Phases=3	Length=32.8084	Units=ft
+New	Line.3_T1_lv_6_OH	Bus1=3_T1_lv.1.2.3	Bus2=6.1.2.3	Geometry=secondary	Phases=3	Length=32.8084	Units=ft
+New	Line.3_T2_lv_7_OH	Bus1=3_T2_lv.1.2.3	Bus2=7.1.2.3	Geometry=secondary	Phases=3	Length=32.8084	Units=ft
+New	Line.4_T1_lv_8_OH	Bus1=4_T1_lv.1.2.3	Bus2=8.1.2.3	Geometry=secondary	Phases=3	Length=32.8084	Units=ft
+New	Line.5_T1_lv_9_OH	Bus1=5_T1_lv.1.2.3	Bus2=9.1.2.3	Geometry=secondary	Phases=3	Length=32.8084	Units=ft
+New	Line.3_T1_COND	Bus1=3.1.2.3	Bus2=3_T1_hv.1.2.3	Linecode=Busbar	Phases=3	Length=0	Units=ft
+New	Line.3_T2_COND	Bus1=3.1.2.3	Bus2=3_T2_hv.1.2.3	Linecode=Busbar	Phases=3	Length=0	Units=ft
+New	Line.4_T1_COND	Bus1=4.1.2.3	Bus2=4_T1_hv.1.2.3	Linecode=Busbar	Phases=3	Length=0	Units=ft
+New	Line.5_T1_COND	Bus1=5.1.2.3	Bus2=5_T1_hv.1.2.3	Linecode=Busbar	Phases=3	Length=0	Units=ft
