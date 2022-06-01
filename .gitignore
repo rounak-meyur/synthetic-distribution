@@ -16,3 +16,5 @@ auxillary/.ipynb_checkpoints
 libs/.ipynb_checkpoints
 ensemble/.ipynb_checkpoints
 compare/.ipynb_checkpoints
+example/cache
+example/__pycache__
