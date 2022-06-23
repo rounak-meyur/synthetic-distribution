@@ -22,6 +22,11 @@ import gurobipy as grb
 from scipy.spatial import Delaunay
 from itertools import combinations
 from collections import defaultdict
+from scipy.spatial import cKDTree
+from math import log,exp
+import shutil
+import tempfile
+from pathlib import Path
 
 
 class Link(LineString):
@@ -153,8 +158,7 @@ class MILP_secondary:
         """
         """
         suffix = datetime.datetime.now().isoformat().replace(':','-').replace('.','-')
-        suffix = ''
-        self.tmp = grbpath+"gurobi/"+suffix+"-"
+        self.tmp = grbpath+suffix
         self.edges = list(graph.edges())
         self.nodes = list(graph.nodes())
         print("Number of edges:",len(self.edges))
@@ -269,6 +273,312 @@ class MILP_secondary:
             print('Solution found, objective = %g' % self.model.ObjVal)
             x_optimal = self.x.getAttr("x").tolist()
             return [e for i,e in enumerate(self.edges) if x_optimal[i]>0.5]
+
+#%% Classes to construct primary network
+class MILP_primary:
+    """
+    Contains methods and attributes to generate the optimal primary distribution
+    network for covering a given set of local transformers through the edges of
+    an existing road network.
+    """
+    def __init__(self,graph,grbpath=None,flowcap=1000,feeder_buffer=1):
+        """
+        graph: the base graph which has the list of possible edges.
+        tnodes: dictionary of transformer nodes with power consumption as value.
+        """
+        # Get tmp path for gurobi log files
+        self.tmp = grbpath
+        
+        # Get data from graph
+        self.edges = list(graph.edges())
+        self.nodes = list(graph.nodes())
+        LABEL = nx.get_node_attributes(graph,name='label')
+        LOAD = nx.get_node_attributes(graph,name='load')
+        LENGTH = nx.get_edge_attributes(graph,name='length')
+        DIST = nx.get_node_attributes(graph,name='distance')
+        self.tindex = [i for i,n in enumerate(self.nodes) if LABEL[n]=='T']
+        self.rindex = [i for i,n in enumerate(self.nodes) if LABEL[n]=='R']
+        self.tnodes = [n for n in self.nodes if LABEL[n]=='T']
+        
+        # Vectorize the data for matrix computation
+        self.d = [1e-3*DIST[self.nodes[i]] for i in self.rindex]
+        self.A = nx.incidence_matrix(graph,nodelist=self.nodes,
+                                     edgelist=self.edges,oriented=True)
+        self.I = nx.incidence_matrix(graph,nodelist=self.nodes,
+                                     edgelist=self.edges,oriented=False)
+        self.c = [1e-3*LENGTH[self.edges[i]] for i in range(len(self.edges))]
+        self.p = np.array([1e-3*LOAD[self.nodes[i]] for i in self.tindex])
+        
+        # Get feeder rating and number
+        total_cap = sum(LOAD.values())*1e-3 # total kVA load to be served
+        feeder_cap = int(total_cap/1000)+feeder_buffer # Maximum number of feeders
+        
+        # Create the optimization model
+        self.model = grb.Model(name="Get Primary Network")
+        self.model.ModelSense = grb.GRB.MINIMIZE
+        self.variables()
+        self.masterTree()
+        self.powerflow()
+        self.radiality()
+        self.flowconstraint(M=flowcap)
+        self.connectivity()
+        self.limit_feeder(M=feeder_cap)
+        self.objective()
+        self.model.write(self.tmp+"primary.lp")
+        self.solve()
+        return
+        
+    
+    def variables(self):
+        """
+        """
+        print("Setting up variables")
+        self.x = self.model.addMVar(len(self.edges),
+                                    vtype=grb.GRB.BINARY,name='x')
+        self.y = self.model.addMVar(len(self.rindex),
+                                    vtype=grb.GRB.BINARY,name='y')
+        self.z = self.model.addMVar(len(self.rindex),
+                                    vtype=grb.GRB.BINARY,name='z')
+        self.f = self.model.addMVar(len(self.edges),
+                                    vtype=grb.GRB.CONTINUOUS,
+                                    lb=-grb.GRB.INFINITY,name='f')
+        self.v = self.model.addMVar(len(self.nodes),
+                                    vtype=grb.GRB.CONTINUOUS,
+                                    lb=0.9,ub=1.0,name='v')
+        self.t = self.model.addMVar(len(self.edges),
+                                    vtype=grb.GRB.BINARY,name='t')
+        self.g = self.model.addMVar(len(self.edges),
+                                    vtype=grb.GRB.CONTINUOUS,
+                                    lb=-grb.GRB.INFINITY,name='g')
+        self.model.update()
+        return
+    
+    def powerflow(self,r=0.8625/39690,M=0.15):
+        """
+        """
+        print("Setting up power flow constraints")
+        expr = r*np.diag(self.c)@self.f
+        self.model.addConstr(self.A.T@self.v - expr - M*(1-self.x) <= 0)
+        self.model.addConstr(self.A.T@self.v - expr + M*(1-self.x) >= 0)
+        self.model.addConstr(1-self.v[self.rindex] <= self.z)
+        self.model.update()
+        return
+    
+    def radiality(self):
+        """
+        """
+        print("Setting up radiality constraints")
+        self.model.addConstr(
+                self.x.sum() == len(self.nodes) - 2*len(self.rindex) + \
+                self.y.sum()+self.z.sum())
+        self.model.update()
+        return
+    
+    def connectivity(self):
+        """
+        """
+        print("Setting up connectivity constraints")
+        self.model.addConstr(
+                self.I[self.rindex,:]@self.x <= len(self.edges)*self.y)
+        self.model.addConstr(
+                self.I[self.rindex,:]@self.x >= 2*(self.y+self.z-1))
+        self.model.addConstr(1-self.z <= self.y)
+        self.model.update()
+        return
+    
+    def flowconstraint(self,M=400):
+        """
+        """
+        print("Setting up capacity constraints for road nodes")
+        self.model.addConstr(self.A[self.rindex,:]@self.f - M*(1-self.z) <= 0)
+        self.model.addConstr(self.A[self.rindex,:]@self.f + M*(1-self.z) >= 0)
+        
+        print("Setting up flow constraints for transformer nodes")
+        self.model.addConstr(self.A[self.tindex,:]@self.f == -self.p)
+        
+        print("Setting up flow constraints")
+        self.model.addConstr(self.f - M*self.x <= 0)
+        self.model.addConstr(self.f + M*self.x >= 0)
+        self.model.update()
+        return
+    
+    def limit_feeder(self,M=10):
+        """
+        """
+        print("Setting up constraint for number of feeders")
+        self.model.addConstr(len(self.rindex)-self.z.sum() <= M)
+        self.model.update()
+        return
+    
+    def masterTree(self):
+        """
+        """
+        print("Setting up imaginary constraints for master solution")
+        M = len(self.nodes)
+        self.model.addConstr(self.A[1:,:]@self.g == -np.ones(shape=(M-1,)))
+        self.model.addConstr(self.g - M*self.t <= 0)
+        self.model.addConstr(self.g + M*self.t >= 0)
+        self.model.addConstr(self.x <= self.t)
+        self.model.update()
+        
+    
+    def objective(self):
+        """
+        """
+        print("Setting up objective function")
+        self.model.setObjective(
+                np.array(self.c)@self.x - np.array(self.d)@self.z + sum(self.d))
+        return
+    
+    def solve(self):
+        """
+        """
+        # Turn off display and heuristics
+        grb.setParam('OutputFlag', 0)
+        grb.setParam('Heuristics', 0)
+        
+        # Open log file
+        logfile = open(self.tmp+'gurobi.log', 'w')
+        
+        # Pass data into my callback function
+        self.model._lastiter = -grb.GRB.INFINITY
+        self.model._lastnode = -grb.GRB.INFINITY
+        self.model._logfile = logfile
+        self.model._vars = self.model.getVars()
+        
+        # Solve model and capture solution information
+        self.model.optimize(mycallback)
+        
+        # Close log file
+        logfile.close()
+        print('')
+        print('Optimization complete')
+        if self.model.SolCount == 0:
+            print('No solution found, optimization status = %d' % self.model.Status)
+            sys.exit(0)
+        else:
+            print('Solution found, objective = %g' % self.model.ObjVal)
+            x_optimal = self.x.getAttr("x").tolist()
+            z_optimal = self.z.getAttr("x").tolist()
+            self.optimal_edges = [e for i,e in enumerate(self.edges) if x_optimal[i]>0.8]
+            self.roots = [self.nodes[ind] for i,ind in enumerate(self.rindex) if z_optimal[i]<0.2]
+            return    
+
+
+class Primary:
+    """
+    Creates the primary distribuion network by solving an optimization problem.
+    First the set of possible edges are identified from the links in road net-
+    -work and transformer connections.
+    """
+    def __init__(self,subdata,master,feedcap=1000,div=10):
+        """
+        """
+        self.subdata = subdata
+        self.graph = nx.Graph()
+        
+        # Update master graph with substation distance data
+        self.hvpath = update_data(master,subdata)
+        print("Road distance updated")
+        
+        # Partition the master graph based on load
+        M = sum(nx.get_node_attributes(master,'load').values())/1e3
+        self.max_mva = max([feedcap,M/div])
+        self.get_partitions(master)
+        print("Master graph partitioned")
+        return
+    
+    def get_partitions(self,graph_list):
+        """
+        This function handles primary network creation for large number of nodes.
+        It divides the network into multiple partitions of small networks and solves
+        the optimization problem for each sub-network.
+        """
+        if type(graph_list) == nx.Graph: graph_list = [graph_list]
+        for g in graph_list:
+            total_mva = sum(nx.get_node_attributes(g,'load').values())/1e3
+            if total_mva < self.max_mva:
+                self.graph = nx.compose(self.graph,g)
+            else:
+                comp = nx.algorithms.community.girvan_newman(g)
+                nodelist = list(sorted(c) for c in next(comp))
+                sglist = [nx.subgraph(g,nlist) for nlist in nodelist]
+                print("Graph with load of ",total_mva," is partioned to",
+                      [sum(nx.get_node_attributes(sg,'load').values())/1e3 \
+                       for sg in sglist])
+                self.get_partitions(sglist)
+        return
+        
+    def get_sub_network(self,grbpath=None,fcap=1000,fbuf=1):
+        """
+        """
+        # Optimizaton problem to get the primary network
+        primary = []; roots = []; tnodes = []
+        for nlist in list(nx.connected_components(self.graph)):
+            subgraph = nx.subgraph(self.graph,list(nlist))
+            M = MILP_primary(subgraph,grbpath=grbpath,flowcap=fcap,
+                             feeder_buffer=fbuf)
+            print("\n\n\n")
+            primary += M.optimal_edges
+            roots += M.roots
+            tnodes += M.tnodes
+        
+        # Add the first edge between substation and nearest road node
+        hvlines = [(self.subdata["id"],r) for r in roots]
+        
+        # Create the network with data as attributes
+        net = self.create_network(primary,hvlines)
+        return net
+    
+    
+    def create_network(self,primary,hvlines):
+        """
+        Create a network with the primary network. The roots of the primary 
+        network are connected to the substation through high voltage lines.
+        Input: 
+            primary: list of edges forming the primary network
+            hvlines: list of edges joining the roots of the primary network with the
+            substation(s).
+        """
+        
+        # Combine both networks and update labels
+        prim_net = nx.Graph()
+        prim_net.add_edges_from(hvlines+primary)
+        
+        # Add node attributes to the primary network
+        for n in prim_net:
+            if n == self.subdata["id"]:
+                prim_net.nodes[n]["cord"] = self.subdata["cord"]
+                prim_net.nodes[n]["label"] = "S"
+                prim_net.nodes[n]["load"] = 0.0
+            else:
+                prim_net.nodes[n]["cord"] = self.graph.nodes[n]["cord"]
+                prim_net.nodes[n]["label"] = self.graph.nodes[n]["label"]
+                prim_net.nodes[n]["load"] = 0.0
+        
+        # Remove cycles in the network formed of road network nodes
+        remove_cycle(prim_net)
+        
+        # Label edges of the created network
+        for e in prim_net.edges:
+            if self.subdata["id"] in e:
+                rnode = e[0] if e[1]==self.subdata["id"] else e[1]
+                path_cords = [self.subdata["cord"]]+\
+                                   [self.graph.nodes[n]["cord"] for n in self.hvpath[rnode]]
+                prim_net.edges[e]['geometry'] = LineString(path_cords)
+                prim_net.edges[e]['length'] = Link(prim_net.edges[e]['geometry']).geod_length
+                prim_net.edges[e]['label'] = 'E'
+                prim_net.edges[e]['r'] = 1e-12 * prim_net.edges[e]['length']
+                prim_net.edges[e]['x'] = 1e-12 * prim_net.edges[e]['length']
+            else:
+                prim_net.edges[e]['geometry'] = LineString((prim_net.nodes[e[0]]["cord"],
+                                                            prim_net.nodes[e[1]]["cord"]))
+                prim_net.edges[e]['length'] = max(Link(prim_net.edges[e]['geometry']).geod_length,1e-12)
+                prim_net.edges[e]['label'] = 'P'
+                prim_net.edges[e]['r'] = 0.8625/39690 * prim_net.edges[e]['length']
+                prim_net.edges[e]['x'] = 0.4154/39690 * prim_net.edges[e]['length']
+        return prim_net
+    
 
 #%% Generic functions
 
@@ -638,4 +948,333 @@ def get_nearpts_tsfr(transformers,homes,heuristic):
         edgelist.extend([(t,n) for n in imphomes])
     return edgelist
 
+#%% Functions for Voronoi partitioning
+def bounds(pt,radius):
+    """
+    Returns the bounds for a point geometry. The bound is a square around the
+    point with side of 2*radius units.
+    
+    pt:
+        TYPE: shapely point geometry
+        DESCRIPTION: the point for which the bound is to be returned
+    
+    radius:
+        TYPE: floating type 
+        DESCRIPTION: radius for the bounding box
+    """
+    return (pt.x-radius, pt.y-radius, pt.x+radius, pt.y+radius)
 
+def find_nearest_node(center_cord,node_cord):
+    """
+    Computes the nearest node in the dictionary 'node_cord' to the point denoted
+    by the 'center_cord'
+    
+    center_cord: 
+        TYPE: list of two entries
+        DESCRIPTION: geographical coordinates of the center denoted by a list
+                     of two entries
+    
+    node_cord: 
+        TYPE: dictionary 
+        DESCRIPTION: dictionary of nodelist with values as the geographical 
+                     coordinate
+    """
+    xmin,ymin = np.min(np.array(list(node_cord.values())),axis=0)
+    xmax,ymax = np.max(np.array(list(node_cord.values())),axis=0)
+    bbox = (xmin,ymin,xmax,ymax)
+    idx = Index(bbox)
+    
+    nodes = []
+    for i,n in enumerate(list(node_cord.keys())):
+        node_geom = Point(node_cord[n])
+        node_bound = bounds(node_geom,0.0)
+        idx.insert(i,node_bound)
+        nodes.append((node_geom, node_bound, n))
+    
+    pt_center = Point(center_cord)
+    center_bd = bounds(pt_center,0.1)
+    matches = idx.intersect(center_bd)
+    closest_node = min(matches,key=lambda i: nodes[i][0].distance(pt_center))
+    return nodes[closest_node][-1]
+
+def get_nearest_road(subs,graph):
+    """
+    Get list of nodes mapped in the Voronoi cell of the substation. The Voronoi 
+    cell is determined on the basis of geographical distance.
+    Returns: dictionary of substations with list of nodes mapped to it as values
+    """
+    # Get the Voronoi centers and data points
+    centers = list(subs.cord.keys())
+    center_pts = [subs.cord[s] for s in centers]
+    nodes = list(graph.nodes())
+    nodepos = nx.get_node_attributes(graph,'cord')
+    nodelabel = nx.get_node_attributes(graph,'label')
+    node_pts = [nodepos[n] for n in nodes]
+    
+    # Find number of road nodes mapped to each substation
+    voronoi_kdtree = cKDTree(center_pts)
+    _, node_regions = voronoi_kdtree.query(node_pts, k=1, 
+                                           distance_upper_bound=0.01)
+    sub_map = {s:node_regions.tolist().count(s) for s in range(len(centers))}
+    
+    # Compute new centers of Voronoi regions
+    centers = [centers[s] for s in sub_map if sub_map[s]>50]
+    center_pts = [subs.cord[s] for s in centers]
+    
+    # Recompute the Voronoi regions and generate the final map
+    voronoi_kdtree = cKDTree(center_pts)
+    _, node_regions = voronoi_kdtree.query(node_pts, k=1)
+    
+    # Index the region and assign the nodes to the substation
+    indS2N = {i:np.argwhere(i==node_regions)[:,0]\
+              for i in np.unique(node_regions)}
+    S2Node = {centers[i]:[nodes[j] for j in indS2N[i]] for i in indS2N}
+    
+    # Compute nearest node to substation
+    S2Near = {}
+    for s in S2Node:
+        nodes_partition = [n for n in S2Node[s] if nodelabel[n]=='R']
+        nodecord = {n: nodepos[n] for n in nodes_partition}
+        S2Near[s] = find_nearest_node(subs.cord[s],nodecord)
+    return S2Near
+
+def get_partitions(S2Near,graph):
+    """
+    Get list of nodes mapped in the Voronoi cell of the substation. The Voronoi 
+    cell is determined on the basis of shortest path distance from each node to
+    the nearest node to the substation.
+    Returns: dictionary of substations with list of nodes mapped to it as values
+    """
+    # Compute Voronoi cells with network distance 
+    centers = list(S2Near.values())
+    cells = nx.voronoi_cells(graph, centers, 'length')
+    
+    # Recompute Voronoi cells for larger primary networks
+    centers = [c for c in centers if len(cells[c])>100]
+    cells = nx.voronoi_cells(graph, centers, 'length')
+    
+    # Recompute S2Near and S2Node
+    S2Near = {s:S2Near[s] for s in S2Near if S2Near[s] in centers}
+    S2Node = {s:list(cells[S2Near[s]]) for s in S2Near}
+    return S2Node
+
+def create_voronoi(subs,graph):
+    """
+    Initialization function to generate master graph for primary network generation
+    and node to substation mapping. The function is called before calling the class
+    object to optimize the primary network.
+    
+    Inputs: 
+        subs: named tuple for substations
+        roads: named tuple for road network
+        tsfr: named tuple for local transformers
+        links: list of road links along which transformers are placed.
+    Returns:
+        graph: master graph from which the optimal network would be generated.
+        S2Node: mapping between substation and road/transformer nodes based on shortest
+        path distance in the master network.
+    """
+    S2Near = get_nearest_road(subs,graph)
+    S2Node = get_partitions(S2Near,graph)
+    return S2Near,S2Node
+
+#%% Functions for primary network creation
+def update_data(graph,subdata):
+    # Get the distance from the nearest substation
+    hvpath = {r:nx.shortest_path(graph,source=subdata['near'],
+                                 target=r,weight='length') \
+              if graph.nodes[r]['label']=='R' else [] for r in graph}
+    hvdist = {r:sum([graph[hvpath[r][i]][hvpath[r][i+1]]['length']\
+                     for i in range(len(hvpath[r])-1)]) for r in graph}
+    nx.set_node_attributes(graph,hvdist,'distance')
+    return hvpath
+
+def remove_cycle(graph):
+    try:
+        cycle = nx.find_cycle(graph)
+        print("Cycles found:",cycle)
+        nodes = list(set([c[0] for c in cycle] + [c[1] for c in cycle]))
+        nodes = [n for n in nodes if graph.nodes[n]['label']=='R']
+        print("Number of nodes:",graph.number_of_nodes())
+        print("Removing cycles...")
+        for n in nodes:
+            graph.remove_node(n)
+        print("After removal...Number of nodes:",graph.number_of_nodes())
+        print("Number of comps.",nx.number_connected_components(graph))
+        remove_cycle(graph)
+    except:
+        print("No cycles found!!!")
+        return
+
+def add_secnet(graph,tsfrdat,homedat):
+    # Add secondary network edges
+    secnet = nx.Graph()
+    for t in tsfrdat:
+        graph.add_edges_from(tsfrdat[t]['secnet'])
+        secnet.add_edges_from(tsfrdat[t]['secnet'])
+    
+    # Add new node/edge attributes
+    hnodes = [n for n in secnet if n not in tsfrdat]
+    for n in hnodes:
+        graph.nodes[n]['cord'] = homedat.cord[n]
+        graph.nodes[n]['label'] = 'H'
+        if n in homedat.average:
+            graph.nodes[n]['load'] = homedat.average[n]
+        else:
+            # use a sample house as the load
+            graph.nodes[n]['load'] = homedat.average[[h for h in homedat.average][0]]
+    
+    for e in graph.edges:
+        if e in secnet.edges:
+            graph.edges[e]['geometry'] = LineString((graph.nodes[e[0]]["cord"],
+                                                     graph.nodes[e[1]]["cord"]))
+            graph.edges[e]['length'] = Link(graph.edges[e]['geometry']).geod_length
+            graph.edges[e]['label'] = 'S'
+            graph.edges[e]['r'] = 0.81508/57.6 * graph.edges[e]['length']
+            graph.edges[e]['x'] = 0.34960/57.6 * graph.edges[e]['length']
+    return graph
+
+#%% Post processing Steps
+def powerflow(graph,v0=1.0):
+    """
+    Checks power flow solution and save dictionary of voltages.
+    """
+    # Pre-processing to rectify incorrect code
+    hv_lines = [e for e in graph.edges if graph.edges[e]['label']=='E']
+    for e in hv_lines:
+        try:
+            length = graph.edges[e]['length']
+        except:
+            length = graph.edges[e]['geo_length']
+        graph.edges[e]['r'] = (0.0822/363000)*length*1e-3
+        graph.edges[e]['x'] = (0.0964/363000)*length*1e-3
+    
+    # Main function begins here
+    A = nx.incidence_matrix(graph,nodelist=list(graph.nodes()),
+                            edgelist=list(graph.edges()),oriented=True).toarray()
+    
+    node_ind = [i for i,node in enumerate(graph.nodes()) \
+                if graph.nodes[node]['label'] != 'S']
+    nodelist = [node for node in list(graph.nodes()) \
+                if graph.nodes[node]['label'] != 'S']
+    edgelist = [edge for edge in list(graph.edges())]
+    
+    # Resistance data
+    edge_r = []
+    for e in graph.edges:
+        try:
+            edge_r.append(1.0/graph.edges[e]['r'])
+        except:
+            edge_r.append(1.0/1e-14)
+    R = np.diag(edge_r)
+    G = np.matmul(np.matmul(A,R),A.T)[node_ind,:][:,node_ind]
+    p = np.array([1e-3*graph.nodes[n]['load'] for n in nodelist])
+    
+    # Voltages and flows
+    v = np.matmul(np.linalg.inv(G),p)
+    f = np.matmul(np.linalg.inv(A[node_ind,:]),p)
+    voltage = {n:v0-v[i] for i,n in enumerate(nodelist)}
+    flows = {e:log(abs(f[i])+1e-10) for i,e in enumerate(edgelist)}
+    subnodes = [node for node in list(graph.nodes()) \
+                if graph.nodes[node]['label'] == 'S']
+    for s in subnodes: voltage[s] = v0
+    nx.set_node_attributes(graph,voltage,'voltage')
+    nx.set_edge_attributes(graph,flows,'flow')
+    return
+
+def assign_linetype(graph):
+    prim_amps = {e:2.2*exp(graph[e[0]][e[1]]['flow'])/6.3 \
+                 for e in graph.edges if graph[e[0]][e[1]]['label']=='P'}
+    sec_amps = {e:1.5*exp(graph[e[0]][e[1]]['flow'])/0.12 \
+                for e in graph.edges if graph[e[0]][e[1]]['label']=='S'}
+    
+    
+    edge_name = {}
+    for e in graph.edges:
+        # names of secondary lines
+        if graph[e[0]][e[1]]['label']=='S':
+            if sec_amps[e]<=95:
+                edge_name[e] = 'OH_Voluta'
+                r = 0.661/57.6; x = 0.033/57.6
+            elif sec_amps[e]<=125:
+                edge_name[e] = 'OH_Periwinkle'
+                r = 0.416/57.6; x = 0.031/57.6
+            elif sec_amps[e]<=165:
+                edge_name[e] = 'OH_Conch'
+                r = 0.261/57.6; x = 0.03/57.6
+            elif sec_amps[e]<=220:
+                edge_name[e] = 'OH_Neritina'
+                r = 0.164/57.6; x = 0.03/57.6
+            elif sec_amps[e]<=265:
+                edge_name[e] = 'OH_Runcina'
+                r = 0.130/57.6; x = 0.029/57.6
+            else:
+                edge_name[e] = 'OH_Zuzara'
+                r = 0.082/57.6; x = 0.027/57.6
+        
+        # names of primary lines
+        elif graph[e[0]][e[1]]['label']=='P':
+            if prim_amps[e]<=140:
+                edge_name[e] = 'OH_Swanate'
+                r = 0.407/39690; x = 0.113/39690
+            elif prim_amps[e]<=185:
+                edge_name[e] = 'OH_Sparrow'
+                r = 0.259/39690; x = 0.110/39690
+            elif prim_amps[e]<=240:
+                edge_name[e] = 'OH_Raven'
+                r = 0.163/39690; x = 0.104/39690
+            elif prim_amps[e]<=315:
+                edge_name[e] = 'OH_Pegion'
+                r = 0.103/39690; x = 0.0992/39690
+            else:
+                edge_name[e] = 'OH_Penguin'
+                r = 0.0822/39690; x = 0.0964/39690
+        else:
+            edge_name[e] = 'OH_Penguin'
+            r = 0.0822/363000; x = 0.0964/363000
+        
+        # Assign new resitance and reactance
+        try:
+            l = graph.edges[e]['length']
+        except:
+            l = graph.edges[e]['geo_length']
+        graph.edges[e]['r'] = r * l * 1e-3
+        graph.edges[e]['x'] = x * l * 1e-3
+    
+    # Add new edge attribute
+    nx.set_edge_attributes(graph,edge_name,'type')
+    return
+
+#%% Shape file generation
+def get_zipped(gdf,filename):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        localFile = filename
+        
+        gdf.to_file(filename=temp_dir, driver='ESRI Shapefile')
+        
+        archiveFile = shutil.make_archive(localFile, 'zip', temp_dir)
+        shutil.rmtree(temp_dir)
+    return
+
+def create_shapefile(net,dest):
+    nodelist = net.nodes
+    d = {'node':[n for n in nodelist],
+        'label':[net.nodes[n]['label'] for n in nodelist],
+         'load':[net.nodes[n]['load'] for n in nodelist],
+         'geometry':[Point(net.nodes[n]['cord']) for n in nodelist]}
+    gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    get_zipped(gdf,dest+"nodelist")
+    
+    edgelist = net.edges
+    d = {'label':[net.edges[e]['label'] for e in edgelist],
+         'nodeA':[e[0] for e in edgelist],
+         'nodeB':[e[1] for e in edgelist],
+         'line_type':[net.edges[e]['type'] for e in edgelist],
+         'r':[net.edges[e]['r'] for e in edgelist],
+         'x':[net.edges[e]['x'] for e in edgelist],
+         'length':[net.edges[e]['length'] for e in edgelist],
+         'geometry':[net.edges[e]['geometry'] for e in edgelist]}
+    gdf = gpd.GeoDataFrame(d, crs="EPSG:4326")
+    get_zipped(gdf,dest+"edgelist")
+    return

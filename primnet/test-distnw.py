@@ -56,6 +56,14 @@ from pyExtractDatalib import GetDistNet
 
 distpath = outpath + "osm-primnet/"
 roadpath = outpath + "osm-prim-master/"
+
+sublist = [148723,150725,150726]
+roadnet = GetPrimRoad(roadpath,sublist)
+synth_net = GetDistNet(distpath,sublist)
+homelist = [n for n in synth_net if synth_net.nodes[n]['label']=='H']
+print(len(homelist))
+sys.exit(0)
+
 sub = 121143
 subdata = {s:subs[s] for s in [sub]}
 roadnet = GetPrimRoad(roadpath,sub)

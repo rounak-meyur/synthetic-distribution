@@ -18,3 +18,5 @@ ensemble/.ipynb_checkpoints
 compare/.ipynb_checkpoints
 example/cache
 example/__pycache__
+example/output
+example/gurobi
