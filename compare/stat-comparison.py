@@ -123,7 +123,7 @@ ax = fig.add_subplot(111)
 draw_bars(df_star,ax,str(k)+"-node star motif")
 fig.savefig("{}{}.png".format(figpath,str(k)+"-star-comp"),bbox_inches='tight')
 
-sys.exit(0)
+# sys.exit(0)
 
 #%% Distribution Comparison
 for area in area_data:
@@ -132,9 +132,10 @@ for area in area_data:
     synth = area_data[area]['synthetic']
     act = area_data[area]['actual']
     
+    root = sub if sub!=7001 else 9001
     deg_act = [nx.degree(act,n) for n in act]
-    hop_act = [nx.shortest_path_length(act,n,sub) for n in act]
-    dist_act = [nx.shortest_path_length(act,n,sub,weight='geo_length')/(1.6e3) \
+    hop_act = [nx.shortest_path_length(act,n,root) for n in act]
+    dist_act = [nx.shortest_path_length(act,n,root,weight='geo_length')/(1.6e3) \
                 for n in act]
     
     deg_synth = [nx.degree(synth,n) for n in synth]
@@ -164,7 +165,7 @@ for area in area_data:
     w_dist = [w_dist_act, w_dist_synth]
     
     
-    # Create the degree distribution comparison
+    # # Create the degree distribution comparison
     # n_synth = synth.number_of_nodes()
     # n_act = act.number_of_nodes()
     # max_deg = 5
@@ -175,23 +176,23 @@ for area in area_data:
     # hop_min = range(0,120,10)
     # hop_max = range(10,130,10)
     # p_hop_act = [(len([h for h in hop_act \
-    #                    if hop_min[i]<=h<=hop_max[i]])+1)/n_act \
-    #              for i in range(len(hop_max))]
+    #                     if hop_min[i]<=h<=hop_max[i]])+1)/n_act \
+    #               for i in range(len(hop_max))]
     # p_hop_synth = [(len([h for h in hop_synth \
-    #                    if hop_min[i]<=h<=hop_max[i]])+1)/n_synth \
-    #              for i in range(len(hop_max))]
+    #                     if hop_min[i]<=h<=hop_max[i]])+1)/n_synth \
+    #               for i in range(len(hop_max))]
     # dist_min = range(0,120,10)
     # dist_max = range(10,130,10)
     # p_dist_act = [(len([h for h in dist_act \
-    #                    if dist_min[i]<=h<=dist_max[i]])+1)/n_act \
-    #              for i in range(len(dist_max))]
+    #                     if dist_min[i]<=h<=dist_max[i]])+1)/n_act \
+    #               for i in range(len(dist_max))]
     # p_dist_synth = [(len([h for h in dist_synth \
-    #                    if dist_min[i]<=h<=dist_max[i]])+1)/n_synth \
-    #              for i in range(len(dist_max))]
+    #                     if dist_min[i]<=h<=dist_max[i]])+1)/n_synth \
+    #               for i in range(len(dist_max))]
     
     # Create the degree distribution comparison
     max_deg = 5
-    fig = plt.figure(figsize=(30,18))
+    fig = plt.figure(figsize=(20,12))
     ax = fig.add_subplot(111)
     ax.hist(deg,bins=[x-0.5 for x in range(1,max_deg+1)],
             weights=w_deg,label=labels,color=colors)
@@ -199,8 +200,8 @@ for area in area_data:
     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
     ax.set_ylabel("Percentage of nodes",fontsize=70)
     ax.set_xlabel("Degree of node",fontsize=70)
-    ax.legend(fontsize=70,markerscale=3)
-    ax.tick_params(axis='both', labelsize=60)
+    ax.legend(fontsize=50,markerscale=2)
+    ax.tick_params(axis='both', labelsize=50)
     
     # KL-divergence
     # E_deg = entropy(p_deg_act,p_deg_synth)
@@ -212,14 +213,14 @@ for area in area_data:
     
     
     # Create the hop distribution comparison
-    fig = plt.figure(figsize=(30,18))
+    fig = plt.figure(figsize=(20,12))
     ax = fig.add_subplot(111)
     ax.hist(hop,weights=w_hop,label=labels,color=colors)
     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
     ax.set_ylabel("Percentage of nodes",fontsize=70)
     ax.set_xlabel("Hops from root node",fontsize=70)
-    ax.legend(fontsize=70,markerscale=3)
-    ax.tick_params(axis='both', labelsize=60)
+    ax.legend(fontsize=50,markerscale=2)
+    ax.tick_params(axis='both', labelsize=50)
     
     # KL-divergence
     # E_hop = entropy(p_hop_act,p_hop_synth)
@@ -231,14 +232,14 @@ for area in area_data:
     
     
     # Create the hop distribution comparison
-    fig = plt.figure(figsize=(30,18))
+    fig = plt.figure(figsize=(20,12))
     ax = fig.add_subplot(111)
     ax.hist(dist,weights=w_hop,label=labels,color=colors)
     ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
     ax.set_ylabel("Percentage of nodes",fontsize=70)
     ax.set_xlabel("Distance from root node (in miles)",fontsize=70)
-    ax.legend(fontsize=70,markerscale=3)
-    ax.tick_params(axis='both', labelsize=60)
+    ax.legend(fontsize=50,markerscale=2)
+    ax.tick_params(axis='both', labelsize=50)
     
     # KL-divergence
     # E_dist = entropy(p_dist_act,p_dist_synth)
@@ -247,3 +248,5 @@ for area in area_data:
     # Save the figure
     filename = "dist-distribution-"+str(sub)
     fig.savefig("{}{}.png".format(figpath,filename),bbox_inches='tight')
+    
+    # print(area,E_deg,E_hop,E_dist)
