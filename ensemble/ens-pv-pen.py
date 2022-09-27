@@ -77,7 +77,7 @@ from matplotlib.patches import Patch
 # sub = 113088
 sub = 121248
 # sub = 121144
-nettype = {147793:'urban',121248:'rural'}
+nettype = {121144:'urban',121248:'rural'}
 
 m_host = 3
 l_host = 0.5 # fraction of residences hosting PV generators
@@ -93,7 +93,62 @@ prim_solar = np.random.choice(prim,m_host,replace=False)
 n_solar = int(l_host*len(res))
 res_solar = np.random.choice(res,n_solar,replace=False)
 
+#%% Plot histogram with error bars
+from matplotlib.ticker import PercentFormatter
 
+def generate_histogram(ax, pen = 0.3, num_net = 20):
+    bins = np.linspace(0.95,1.05,11)
+    bincenters = 0.5*(bins[1:]+bins[:-1])
+    y1 = np.zeros(shape=(num_net,len(bincenters)))
+    y2 = np.zeros(shape=(num_net,len(bincenters)))
+    for k in range(num_net):
+        l_rating = 1e-3*pen*total_load/n_solar
+        l_voltages = run_powerflow(sub,k+1,res_solar,l_rating)
+        m_rating = 1e-3*pen*total_load/m_host
+        m_voltages = run_powerflow(sub,k+1,prim_solar,m_rating)
+        
+        y1[k,:],_ = np.histogram(l_voltages,bins=bins)
+        y2[k,:],_ = np.histogram(m_voltages,bins=bins)
+        print("Done with network "+str(k+1))
+    
+    y1_mean = np.mean(y1,0)
+    y2_mean = np.mean(y2,0)
+    y1_std = np.std(y1,0)
+    y2_std = np.std(y2,0)
+    
+    width = 0.0045
+    x1 = bincenters - width/2
+    x2 = bincenters + width/2
+    ax.bar(x1, y1_mean, yerr=y1_std, width=width, color='royalblue', 
+           label='LV level penetration', ecolor='black', capsize=10)
+    ax.bar(x2, y2_mean, yerr=y2_std, width=width, color='crimson', 
+           label='MV level penetration', ecolor='black', capsize=10)
+    ax.legend(loc='best',prop={'size': 20})
+    ax.tick_params(axis='y',labelsize=25)
+    ax.tick_params(axis='x',labelsize=25)
+    ax.yaxis.set_major_formatter(PercentFormatter(N))
+    ax.set_ylim(0,0.7*N)
+    ax.set_xlabel("Voltage in pu",fontsize=25)
+    ax.set_ylabel("Percentage of nodes",fontsize=25)
+    return
+
+
+fig = plt.figure(figsize=(32,8))
+ax1 = fig.add_subplot(1,3,1)
+generate_histogram(ax1, pen = 0.3)
+ax1.set_title("PV penetration of 30% in LV and MV networks",fontsize=25)
+ax2 = fig.add_subplot(1,3,2)
+generate_histogram(ax2, pen = 0.5)
+ax2.set_title("PV penetration of 50% in LV and MV networks",fontsize=25)
+ax3 = fig.add_subplot(1,3,3)
+generate_histogram(ax3, pen = 0.8)
+ax3.set_title("PV penetration of 80% in LV and MV networks",fontsize=25)
+
+fig.savefig("{}{}.png".format(figpath+str(sub),'-volt-penetration-ens-comp'),
+            bbox_inches='tight')
+
+sys.exit(0)
+#%% Generate dataframe for plotting outliers
 # Initialize data for pandas dataframe
 data = {'count':[],'stack':[],'pen':[],'group':[]}
 

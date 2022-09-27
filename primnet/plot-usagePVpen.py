@@ -27,7 +27,7 @@ distpath = workpath + "/out/osm-primnet/"
 
 sys.path.append(libpath)
 from pyExtractDatalib import GetDistNet
-from pyBuildPrimNetlib import powerflow,assign_linetype
+from pyMiscUtilslib import powerflow,assign_linetype
 print("Imported modules")
 
 
@@ -104,27 +104,27 @@ def plot_hosting(sub,solar,path,name):
 
 
 #%% Get some substation IDs
-with open(inppath+"rural-sublist.txt") as f:
-    rural = f.readlines()
-rural = [int(r) for r in rural[0].strip('\n').split(' ')]
-f_done = [int(f.strip('-prim-dist.gpickle')) for f in os.listdir(distpath)]
-rural_done = [r for r in f_done if r in rural]
+# with open(inppath+"rural-sublist.txt") as f:
+#     rural = f.readlines()
+# rural = [int(r) for r in rural[0].strip('\n').split(' ')]
+# f_done = [int(f.strip('-prim-dist.gpickle')) for f in os.listdir(distpath)]
+# rural_done = [r for r in f_done if r in rural]
 
 #%% Plot histogram of voltages
-from matplotlib.ticker import PercentFormatter,ScalarFormatter
-sub = rural_done[10]
+from matplotlib.ticker import PercentFormatter
+
 # sub = 121144
 # sub = 147793
-synth_net = GetDistNet(distpath,sub)
-N = synth_net.number_of_nodes()
-total_load = sum([synth_net.nodes[n]['load'] for n in synth_net])
+# synth_net = GetDistNet(distpath,sub)
+# N = synth_net.number_of_nodes()
+# total_load = sum([synth_net.nodes[n]['load'] for n in synth_net])
 
 
 #%% Plot histogram of voltages
 
-sub = 147793
+# sub = 147793
 # sub = 113088
-# sub = 121248
+sub = 121248
 # sub = 121144
 
 
@@ -178,7 +178,7 @@ v_random3_lv = run_powerflow(sub,res_solar,rating3)
 #%%
 
 def generate_bars(ax,data1,data2):
-    width = 0.003
+    width = 0.01
     bins = np.linspace(0.95,1.05,15)
     bincenters = 0.5*(bins[1:]+bins[:-1])
     
@@ -193,35 +193,36 @@ def generate_bars(ax,data1,data2):
            label='LV level penetration')
     ax.bar(x2, y2, width=width, color='crimson', 
            label='MV level penetration')
-    ax.legend(loc='best',prop={'size': 14})
+    ax.legend(loc='best',prop={'size': 20})
+    ax.tick_params(axis='y',labelsize=20)
+    ax.tick_params(axis='x',labelsize=20)
+    ax.yaxis.set_major_formatter(PercentFormatter(N))
+    ax.set_ylim(0,0.6*N)
     return
 
 
 
 
 #%% Plot the histogram
-fig = plt.figure(figsize=(24,6))
+fig = plt.figure(figsize=(28,6))
 ax1 = fig.add_subplot(131)
 ax2 = fig.add_subplot(132)
 ax3 = fig.add_subplot(133)
 
 generate_bars(ax1,v_random1_lv,v_random1_mv)
-ax1.set_xlabel("Voltage in pu",fontsize=15)
-ax1.set_ylabel("Percentage of nodes",fontsize=15)
-ax1.yaxis.set_major_formatter(PercentFormatter(N))
-ax1.set_title("PV penetration of 30% in LV and MV networks",fontsize=15)
+ax1.set_xlabel("Voltage in pu",fontsize=25)
+ax1.set_ylabel("Percentage of nodes",fontsize=25)
+ax1.set_title("PV penetration of 30% in LV and MV networks",fontsize=25)
 
 generate_bars(ax2,v_random2_lv,v_random2_mv)
-ax2.set_xlabel("Voltage in pu",fontsize=15)
-ax2.set_ylabel("Percentage of nodes",fontsize=15)
-ax2.yaxis.set_major_formatter(PercentFormatter(N))
-ax2.set_title("PV penetration of 50% in LV and MV networks",fontsize=15)
+ax2.set_xlabel("Voltage in pu",fontsize=25)
+ax2.set_ylabel("Percentage of nodes",fontsize=25)
+ax2.set_title("PV penetration of 50% in LV and MV networks",fontsize=25)
 
 generate_bars(ax3,v_random3_lv,v_random3_mv)
-ax3.set_xlabel("Voltage in pu",fontsize=15)
-ax3.set_ylabel("Percentage of nodes",fontsize=15)
-ax3.yaxis.set_major_formatter(PercentFormatter(N))
-ax3.set_title("PV penetration of 80% in LV and MV networks",fontsize=15)
+ax3.set_xlabel("Voltage in pu",fontsize=25)
+ax3.set_ylabel("Percentage of nodes",fontsize=25)
+ax3.set_title("PV penetration of 80% in LV and MV networks",fontsize=25)
 
 fig.savefig("{}{}.png".format(figpath+str(sub),'-volt-penetration-comp'),
             bbox_inches='tight')
