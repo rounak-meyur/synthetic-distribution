@@ -262,6 +262,8 @@ ax.yaxis.set_major_formatter(FuncFormatter(to_percent))
 ax.set_ylabel("Percentage of lines",fontsize=45)
 ax.set_xlabel("Flow in kVA",fontsize=45)
 ax.legend(fontsize=30,markerscale=2)
+ax.set_xticks([1,2.5,5,10,25,50,100], 
+              labels=['1','2.5','5','10','25','50','100'])
 ax.tick_params(axis='both', labelsize=30)
 
 
@@ -279,27 +281,7 @@ filename = "flow-comparison"
 fig.savefig("{}{}.png".format(figpath,filename),bbox_inches='tight')
 
     
-#%% Plot the network    
-# fig = plt.figure(figsize=(20,20))
-# ax = fig.add_subplot(111)
 
-# d = {'nodes':range(len(homelist)),
-#       'geometry':[Point(synth_net.nodes[n]['cord']) for n in homelist]}
-
-# df_nodes = gpd.GeoDataFrame(d, crs="EPSG:4326")
-# df_nodes.plot(ax=ax,color='red',markersize=1.0)
-
-
-# d = {'edges':range(len(df_lines)),
-#      'geometry':[df_lines['geometry'][i] for i in range(len(df_lines))]}
-# df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
-# df_edges.plot(ax=ax,edgecolor='black',linewidth=1.0)
-
-
-# edgegeom = [synth_net.edges[e]['geometry'] for e in synth_net.edges]
-# d = {'edges':range(len(edgegeom)),'geometry':edgegeom}
-# df_edges = gpd.GeoDataFrame(d, crs="EPSG:4326")
-# df_edges.plot(ax=ax,edgecolor='blue',linewidth=1.0)
 
 
 
